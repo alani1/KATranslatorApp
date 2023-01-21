@@ -1,0 +1,27 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<h2>{{ title }}.</h2>
+<h3>{{ message|safe }}</h3>
+
+<br />
+
+<p>{{ subtitleInfo | safe }}</p>
+
+<br/>
+<hr />
+<form action="{{ url_for('Subtitles.subtitles') }}" method="post">
+    <div class="form-group">
+        <label for="amaraAPI">Amara-Key</label> &nbsp;<input name="amaraAPI" type=text value="{{ amaraAPI }}">
+    </div>
+    <div class="form-group">
+        <label for="YTid">Youtube-ID</label> &nbsp;<input name="YTid" type=text value="{{ YTid }}">
+    </div>
+    <button type="submit" class="btn btn-primary">Translate</button>
+</form>
+
+
+
+
+{% endblock %}
