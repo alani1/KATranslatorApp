@@ -4,7 +4,7 @@ from flask import (
     Blueprint, flash, g, redirect, render_template, make_response, request, session, url_for
 )
 import requests
-import Configuration
+from TranslatorApp import Configuration
 
 
 def jprint(obj):
@@ -38,7 +38,10 @@ class Subtitles(object):
         if 'YTid' in request.form:
             self.YTid = request.form['YTid']
 
-        self.amaraAPI = request.cookies.get('amaraAPI')
+        amaraAPI = request.cookies.get('amaraAPI')
+        if (amaraAPI):
+            print("cookie: " + amaraAPI)
+            self.amaraAPI = amaraAPI
 
         if 'amaraAPI' in request.form:
             self.amaraAPI = request.form['amaraAPI']
@@ -54,13 +57,15 @@ class Subtitles(object):
     
         resp = make_response(render_template(
             'subtitle.html',
-            title='Subtitle',
+            title='Subtitle Translator',
             year=datetime.now().year,
             message=self.message,
             subtitleInfo=self.subtitleInfo,
             YTid=self.YTid,
             amaraAPI=self.amaraAPI
         ))
+
+
         if len(self.amaraAPI) > 0:
             resp.set_cookie('amaraAPI', self.amaraAPI)
     
