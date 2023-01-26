@@ -26,11 +26,11 @@ class Subtitles(object):
     deeplAPI = Configuration.deeplAPI
 
     def __init__(self, YTid = ""):
-        self.YTid = "XN4AxR78Yc0"
         self.YTid = ""
         self.amaraAPI = ""
+        self.force = False
         self.subtitleInfo = ""
-        self.message = "what is the message??"
+        self.message = "what is the message123??"
 
         if len(YTid) > 0:
             self.YTid = YTid
@@ -46,11 +46,13 @@ class Subtitles(object):
         if 'amaraAPI' in request.form:
             self.amaraAPI = request.form['amaraAPI']
 
+        if 'force' in request.form:
+            self.message = "may the force be with you"
+            self.force = request.form['force']
 
     def render(self):
         
         if len(self.YTid) > 0:
-            self.message = "what message to display??"          
             self.getEnglishSubtitle()
         else:
             self.message = "Please enter a Youtube ID and your Amara API Key to translate"
@@ -168,23 +170,22 @@ class Subtitles(object):
                                 return "check message"
 
                             subInfo = subResult.json()
-                            #return jprint(subInfo)
-                            #if not lang['published']:
-                            if ( not subInfo["subtitles_complete"] and (subInfo["subtitle_count"] == 0) ):
-                                return self.translateSubtitleAndSubmit(enSubtitle, vid, subInfo["published"])        
+                         
+                            if ( not subInfo["subtitles_complete"] ):
+                                return self.translateSubtitleAndSubmit(enSubtitle, vid, subInfo["published"], subInfo["subtitle_count"])        
 
                             else:
                                 self.message = "This Subtitle has already been translated to German"
                                 return ""
                 
-                    return self.translateSubtitleAndSubmit(enSubtitle, vid, False)
+                    return self.translateSubtitleAndSubmit(enSubtitle, vid, False, 0)
 
             self.message = "<b>Error, Khan Academy Team not found," + amaraID
 
         else:
             self.message = "<b>Unknown Video</b><br/>Youtube Video could not be found on amara.org"
 
-    def translateSubtitleAndSubmit(self, enSubtitle, vid, published):
+    def translateSubtitleAndSubmit(self, enSubtitle, vid, published, subtitle_count):
         amaraID = vid['id']
         title = vid['title']
         description = vid['description']
@@ -192,7 +193,8 @@ class Subtitles(object):
         #check if this is assigned to myself
         if self.isAssignedToMe(amaraID):
         
-            if not published:
+            if self.force or (not published and subtitle_count == 0):
+ 
                 result = self.deeplTranslate(enSubtitle.content)
 
                 if result:
@@ -209,7 +211,7 @@ class Subtitles(object):
 
 
             else:
-                self.message + "<b>There are already versions of this Video, please Review, Edit and Publish</b>" 
+                self.message = "<b>There are already versions of this Video, please Review, Edit and Publish</b>" 
         else:
             self.message = '<b>Please Assign this Video to yourself by clicking on Translate Button<br/>' + str(getAmaraVideoLink(amaraID))  
 
