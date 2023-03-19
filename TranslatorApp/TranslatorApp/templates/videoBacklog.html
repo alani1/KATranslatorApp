@@ -7,7 +7,7 @@
 <script type="text/javascript">
     var showAll = false;
     var filter = 'math16'
-    var user = ''
+    var user = '{{ userFilter }}'
 
     function refreshGrid() {
         if (user != '') {
@@ -168,7 +168,15 @@
                     }
                 }
             },
-            { id: "translator", field: "translator", name: "Uebersetzer"},
+            {
+                id: "translator", field: "translator", name: "Uebersetzer",
+                formatter: (value) => {
+                    if ( value != null)
+                        return gridjs.html(`<a target="_blank" href="{{baseURL}}/content/?user=${value}">${value}</a>`);
+                    else
+                        return ''
+                }
+            },
             {
                 id: "translation_date", field: "translation_date", name: "T-Datum",
                 formatter: (value) => {
