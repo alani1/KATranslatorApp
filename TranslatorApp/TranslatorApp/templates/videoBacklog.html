@@ -161,7 +161,7 @@
                     // Only show action buttons if the user is logged in on KADE
                     return gridjs.html(
                         `<a target="_blank" href="${row.cells[1].data}"><button class="btn btn-primary">KA</button></a>&nbsp;` +
-                        `<a target="_blank" href="/subtitles/${row.cells[2].data}"><button class="btn btn-primary">SUB</button></a>&nbsp`
+                        `<a target="_blank" href="{{baseURL}}/subtitles/${row.cells[2].data}"><button class="btn btn-primary">SUB</button></a>&nbsp`
                         {% if user.isAdmin() %}
                         + `<button type="button" class="btn btn-primary" onclick="
                             $('#modalTitelLabel').text('${row.cells[7].data}');
