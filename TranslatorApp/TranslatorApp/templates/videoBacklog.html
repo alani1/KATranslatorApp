@@ -3,27 +3,56 @@
 {% block content %}
 
 <h2>{{ title }}.</h2>
-<h3>{{ message|safe }}</h3>
-
-<br />
 
 <script type="text/javascript">
-    function setFilter(filter) {
-        myGrid.config.server.url = '{{ baseURL }}/content/data?filter=' + filter;
+    var showAll = false;
+    var filter = 'math16'
+    var user = ''
+
+    function refreshGrid() {
+        if (user != '') {
+            url = '{{ baseURL }}/content/data?user=' + user;
+        } else {
+            url = '{{ baseURL }}/content/data?filter=' + filter;
+        }
+        
+        if (showAll) {
+            url = url + '&showAll=1'
+        }
+        myGrid.config.server.url = url
         myGrid.forceRender();
+    }
+
+    function setFilter(myFilter) {
+        filter = myFilter;
+        user = '';
+        refreshGrid()
         return false;
+    }
+    function showBacklog(myUser) {
+        user = myUser;
+        refreshGrid();
+        return false;
+    }
+    function toggleShowAll() {
+        showAll = !showAll;
+        refreshGrid();
     }
 </script>
 
 {% if user['name'] != '' %}
 <p>You are logged in as "{{ user['name'] }}" as {{ user['role'] }}</p>
 {% endif %}
+<div class="form-check form-switch">
+    <input class="form-check-input" type="checkbox" id="flexSwitchCheckDefault" onclick="toggleShowAll()">
+    <label class="form-check-label" for="flexSwitchCheckDefault">Show All</label>
+</div>
 <h2>
-    Current Focus:
     {% if user != '' %}
-    <a href="?filter=math13" onclick="return setFilter('backlog')">My Backlog</a>,
+    <a href="?user={{ user['name'] }}" onclick="return showBacklog('{{ user['name'] }}')">My Backlog</a>,
     {% endif %}
     <a href="?filter=math13" onclick="return setFilter('math16')">Math 1-6</a>, <a href="?filter=math713" onclick="return setFilter('math713')">Math 7-13</a>, <a href="?filter=computing" onclick="return setFilter('computing')">Computing</a>
+
 </h2>
 <hr />
 <table id="table" class="display" width="100%"></table>
@@ -195,8 +224,13 @@
             }
         ],
         server: {
+            {% if userFilter != '' %}
+            url: '{{baseURL}}/content/data?user={{ userFilter }}',
+            {% else %}
             url: '{{baseURL}}/content/data?filter={{ filter }}',
+            {% endif %}
             then: data => data,
+
         },
 
 

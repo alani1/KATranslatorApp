@@ -19,8 +19,9 @@ class User(object):
         self.role = ''
 
         if Configuration.mode == 'dev':
-            self.name = 'Admin'
+            self.name = Configuration.devUser
             self.role = 'administrator'
+            self.user_level = 10
         else:
             self.checkUserCookie()
 
@@ -81,14 +82,22 @@ class KAContent(object):
 
 
     #Load Data from Content Database
-    def loadData(self,filter,backlog=True):
+    def loadData(self,user, filter, showAll=False):
 
         # Only select Items which are in Backlog        
         with self.dbConnection.cursor() as cursor:
             sql = "SELECT * FROM %s.`ka-content`" % Configuration.dbDatabase
 
-            print("Filter is : " + filter)
             where = []
+
+            print(user)
+            if (user != None and user != ''):
+                where.append("translator = '%s'" % user)
+                if (not showAll):
+                    where.append("(translation_status = '' or translation_status = 'Assigned')")
+            elif not showAll:
+                where.append("(translation_status = '' or translation_status is NULL)")
+
             if (filter == "math16"):
                 where.append("course in ('cc-kindergarten-math', 'cc-1st-grade-math', 'cc-2nd-grade-math', 'cc-third-grade-math', 'cc-fourth-grade-math', 'cc-fifth-grade-math', 'cc-sixth-grade-math')")
             
@@ -98,8 +107,9 @@ class KAContent(object):
             if (filter == "computing"):
                 where.append("domain = 'computing'")
                 where.append("course in ('computer-programming', 'computer-science')")
-                
-            if (backlog):
+            
+            #Always filter for Videos which are neither dubbed nor subbed
+            if (True):
                 #where.append("backlog='1'")
                 where.append("(kind='Video' or kind='Talkthrough')")
                 where.append("dubbed='False'")
@@ -134,12 +144,20 @@ class KAContent(object):
         
     def render(self, domainFilter="math16"):
 
+        user = request.args.get('user')
+        if ( user != None):
+            domainFilter = ''
+            userFilter = user
+        else:
+            domainFilter = 'math16'
+            userFilter = ''
 
         return make_response(render_template(
             'videoBacklog.html',
             title='Show Content in the KADeutsch Backlog',
             year=datetime.now().year,
             filter=domainFilter,
+            userFilter=userFilter,
             message=self.message,
             user=self.user,
             baseURL=Configuration.baseURL
@@ -165,15 +183,22 @@ def content():
     #Create Blueprint Object
     v = KAContent()
 
-    
     valid_filters = [ 'math16', 'math713', 'computing'] # List of valid filter parameters
     filter = ""
     iFilter = request.args.get('filter')
     if iFilter in valid_filters:
             filter = iFilter
 
+    user = request.args.get('user')
+
+    showAll = request.args.get('showAll')
+    if showAll == None or showAll != '1':
+        showAll = False
+    else:
+        showAll = True
+
     #Get
-    return v.loadData(filter)
+    return v.loadData(user, filter, showAll)
 
 @kabp.route('/data/<id>', methods = ['POST'])
 def saveData(id):
