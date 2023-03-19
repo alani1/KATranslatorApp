@@ -6,7 +6,15 @@
     <title>{{ title }} - KA Deutsch Translator Portal</title>
     <link rel="stylesheet" type="text/css" href="/static/content/bootstrap.min.css" />
     <link rel="stylesheet" type="text/css" href="/static/content/site.css" />
+
     <script src="/static/scripts/modernizr-2.6.2.js"></script>
+
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/gridjs/dist/theme/mermaid.min.css" />
+    <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
+    <style>
+        div.container {max-width:100%}
+    </style>
+
 </head>
 
 <body>
@@ -23,6 +31,7 @@
             <div class="navbar-collapse collapse">
                 <ul class="nav navbar-nav">
                     <li><a href="{{ url_for('home') }}">Home</a></li>
+                    <li><a href="{{ url_for('KAContent.videoBacklog') }}">Backlog</a></li>
                     <li><a href="{{ url_for('Subtitles.subtitles') }}">Untertitel</a></li>
                     <li><a href="{{ url_for('about') }}">Contact</a></li>
                 </ul>

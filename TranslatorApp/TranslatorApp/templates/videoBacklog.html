@@ -1,0 +1,233 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<h2>{{ title }}.</h2>
+<h3>{{ message|safe }}</h3>
+
+<br />
+
+<script type="text/javascript">
+    function setFilter(filter) {
+        myGrid.config.server.url = '{{baseURL}}/content/data?filter=' + filter;
+        myGrid.forceRender();
+        return false;
+    }
+</script>
+
+{% if user != '' %}
+<p>You are logged in as {{ user['name'] }} as {{ user['role'] }}</p>
+{% endif %}
+<h2>
+    Current Focus:
+    {% if user != '' %}
+    <a href="?filter=math13" onclick="return setFilter('backlog')">My Backlog</a>,
+    {% endif %}
+    <a href="?filter=math13" onclick="return setFilter('math16')">Math 1-6</a>, <a href="?filter=math713" onclick="return setFilter('math713')">Math 7-13</a>, <a href="?filter=computing" onclick="return setFilter('computing')">Computing</a>
+</h2>
+<hr />
+<table id="table" class="display" width="100%"></table>
+
+{% if user.isAdmin() %}
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                <h5 class="modal-title" id="editTranslatorModalLabel">Edit Content Element</h5>
+                <h4 class="modal-title" id="modalTitelLabel">TITLE</h4>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="id" name="id" />
+                <div class="form-group">
+                    <label for="translator">Translator</label>
+                    <input type="text" class="form-control" id="translator" name="translator" placeholder="Enter Translator's name">
+                </div>
+                <div class="form-group">
+                    <label for="translationDate">Translation Date</label>
+                    <input type="date" class="form-control" id="translationDate" name="translationDate" placeholder="Enter Translation Date">
+                </div>
+                <div class="form-group">
+                    <label for="translationStatus">Status</label>
+                    <select type="date" class="form-control" id="translationStatus" name="status" placeholder="status">
+                        <option></option>
+                        <option value="Assigned">Assigned</option>
+                        <option value="Translated">Translated</option>
+                        <option value="Approved">Approved</option>
+                        <option value="AI Dubbed">AI Dubbed</option>
+                        <option value="Native Dubbed">Native Dubbed</option>
+
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="translationComment">Comment</label>
+                    <textarea class="form-control" id="translationComment" rows="2"></textarea>
+                </div>
+                <hr />
+                <div class="form-group">
+                    <input class="form-check-input" type="checkbox" id="subbed">
+                    <label for="subbed">Subbed</label>
+                </div>
+
+                <div class="form-group">
+                    <input class="form-check-input" type="checkbox" id="dubbed">
+                    <label for="dubbed">Dubbed</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="saveTranslator()">Save changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script type="text/javascript">
+    myGrid=new gridjs.Grid({
+
+
+        //columns: ["Art", "Domain", "Kurs", "Tutorial", "Lektion", "Titel", "Duration", "Dubbed", "Subtitled", "Translator", "Date", "Published", "Actions"],
+        pagination: {
+            limit: 10
+        },
+        //sort: true,
+        search: true,
+
+        columns: [
+            { id: "id", field: "id", hidden: true },
+            { id: "canonical_url", field: "canonical_url", hidden: true },
+            { id: "youtube_id", field: "youtube_id", hidden: true },
+
+            { id: "domain", field: "domain", name: "Fach" },
+            {
+                id: "course", field: "course", name: "Kurs",
+                formatter: (value, row) => {
+                    return gridjs.html(`<a target="_blank" href="https://de.khanacademy.org/${row.cells[3].data}/${value}">${value}</a>`);
+                }
+            },
+            {
+                id: "unit", field: "unit", name: "Lerneinheit",
+                formatter: (value, row) => {
+                    return gridjs.html(`<a target="_blank" href="https://de.khanacademy.org/${row.cells[3].data}/${row.cells[4].data}/${value}">${value}</a>`);
+                }
+            },
+            { id: "lesson", field: "lesson", name: "Lektion" },
+            {
+                id: "original_title", field: "original_title", name: "Titel",
+                formatter: (cell) => gridjs.html(`<b>${cell}</b>`)
+            },
+            {
+                id: "dubbed", field: "dubbed", name: "dubbed",
+                formatter: (value) => {
+                    if (value == 'True') {
+                        return gridjs.html(`<div style="background-color: green;">${value}</div>`);
+                    } else {
+                        return gridjs.html(`<div style="background-color: red;">${value}</div>`);
+                    }
+                }
+            },
+            {
+                id: "subbed", field: "subbed", name: "subbed",
+                formatter: (value) => {
+                    if (value == 'True') {
+                        return gridjs.html(`<div style="background-color: green;">${value}</div>`);
+                    } else {
+                        return gridjs.html(`<div style="background-color: red;">${value}</div>`);
+                    }
+                }
+            },
+            { id: "translator", field: "translator", name: "Uebersetzer"},
+            {
+                id: "translation_date", field: "translation_date", name: "T-Datum",
+                formatter: (value) => {
+                    if (value != null ) {
+                        var dateObj = new Date(value);
+                        return dateObj.toLocaleDateString();
+                    } else
+                        return value;
+
+                }
+            },
+            { id: "translation_status", field: "translation_status", name: "Status" },
+            { id: "listed", field: "listed", name: "Published" },
+            { id: "translation_comment", field: "translation_comment", name: "Comment", hidden:true },
+            {
+                id: "Actions", name: "Actions",
+                formatter: (cell, row) => {
+
+                    // Only show action buttons if the user is logged in on KADE
+                    return gridjs.html(
+                        `<a target="_blank" href="${row.cells[1].data}"><button class="btn btn-primary">KA</button></a>&nbsp;` +
+                        `<a target="_blank" href="/subtitles/${row.cells[2].data}"><button class="btn btn-primary">SUB</button></a>&nbsp`
+                        {% if user.isAdmin() %}
+                        + `<button type="button" class="btn btn-primary" onclick="
+                            $('#modalTitelLabel').text('${row.cells[7].data}');
+                            $('#id').val('${row.cells[0].data}');
+                            $('#translator').val('${row.cells[10].data}');
+
+                            //Automatically set date to today if it is null, else take from DB
+                            if ('${row.cells[11].data}' == 'null') {
+                                $('#translationDate').val(new Date().toISOString().slice(0, 10));
+                            } else {
+                                $('#translationDate').val(new Date('${row.cells[11].data}').toISOString().slice(0, 10));
+                            }
+                            $('#translationStatus').val('${row.cells[12].data}');
+                            $('#translationComment').text('${row.cells[14].data}');
+
+                            if ( '${row.cells[8].data}' == 'True') {
+                                $('#dubbed').prop('checked', true);
+                            }
+
+                            if ( '${row.cells[9].data}' == 'True') {
+                                $('#dubbed').prop('checked', true);
+                            }
+
+                            $('#editModal').modal('show');">Edt</button>`
+                        {% endif %}
+                    )
+                    // Link to Translation Portal 1stID is the Domain, second ID is the Course
+                    // https://de.khanacademy.org/devadmin/translations/xff10333bf599f93a/xffde7c31/?
+
+                }
+            }
+        ],
+        server: {
+            url: '{{baseURL}}/content/data?filter={{ filter }}',
+            then: data => data,
+        },
+
+
+    }).render(document.getElementById("table"));
+
+    function saveTranslator() {
+        var id = $("#id").val();
+        var translator = $("#translator").val();
+        var translationDate = $("#translationDate").val();
+        var translationStatus = $("#translationStatus").val();
+        var translationComment = $("#translationComment").val();
+        var subbed = $("#subbed").prop('checked');
+        var dubbed = $("#dubbed").prop('checked');
+        var data = { "translator": translator, "translationDate": translationDate, "translationStatus": translationStatus, "translationComment": translationComment, "subbed": subbed, "dubbed": dubbed };
+
+        $.ajax({
+            type: "POST",
+            url: '{{baseURL}}/content/data/'+id,
+            data: JSON.stringify(data),
+            contentType: "application/json",
+            success: function (response) {
+                myGrid.forceRender();
+                $("#editModal").modal("hide");
+            },
+            error: function (xhr, status, error) {
+                alert("Error: " + error);
+            }
+        });
+
+    }
+
+</script>
+
+{% endblock %}

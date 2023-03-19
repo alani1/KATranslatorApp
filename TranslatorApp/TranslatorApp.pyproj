@@ -19,6 +19,7 @@
     <RootNamespace>TranslatorApp</RootNamespace>
     <PythonDebugWebServerCommandEnvironment>FLASK_DEBUG=1
 </PythonDebugWebServerCommandEnvironment>
+    <SuppressEnvironmentCreationPrompt>True</SuppressEnvironmentCreationPrompt>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -31,6 +32,9 @@
   <ItemGroup>
     <Compile Include="runserver.py" />
     <Compile Include="TranslatorApp\Configuration.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="TranslatorApp\kaContent.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="TranslatorApp\subtitle.py">
@@ -79,6 +83,7 @@
     <Content Include="TranslatorApp\templates\subtitleInfo.html">
       <SubType>Code</SubType>
     </Content>
+    <Content Include="TranslatorApp\templates\videoBacklog.html" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.Web.targets" />
   <!-- Specify pre- and post-build commands in the BeforeBuild and 

@@ -18,9 +18,6 @@ def getAmaraVideoLink(amaraID):
     return '<a target=_new href="https://amara.org/en/videos/' + amaraID + '/de?team=khan-academy">Link to Amara Video</a>'
 
 
-bp = Blueprint('Subtitles', __name__, url_prefix='/subtitles')
-
-
 class Subtitles(object):
 
     deeplAPI = Configuration.deeplAPI
@@ -216,6 +213,7 @@ class Subtitles(object):
             self.message = '<b>Please Assign this Video to yourself by clicking on Translate Button<br/>' + str(getAmaraVideoLink(amaraID))  
 
 
+bp = Blueprint('Subtitles', __name__, url_prefix='/subtitles')
 @bp.route('/', methods = ['GET', 'POST'])
 @bp.route('/<YTid>', methods = ['GET', 'POST'])
 def subtitles(YTid=""):

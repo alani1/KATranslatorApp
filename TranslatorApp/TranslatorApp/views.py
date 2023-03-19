@@ -4,7 +4,10 @@ Routes and views for the flask application.
 
 from datetime import datetime
 from flask import render_template
-from TranslatorApp import app, subtitle
+from TranslatorApp import app, kaContent, subtitle
+
+app.register_blueprint(subtitle.bp)
+app.register_blueprint(kaContent.kabp)
 
 @app.route('/')
 @app.route('/home')
@@ -14,20 +17,6 @@ def home():
         'index.html',
         title='Translator Home',
         year=datetime.now().year,
-    )
-
-@app.route('/subtitlesOLD', methods = ['GET', 'POST'])
-def subtitlesOLD():
-    """Renders the subtitle translation page."""
-
-    st = subtitle.hello();
-
-    return render_template(
-        'subtitle.html',
-        title='Subtitle',
-        year=datetime.now().year,
-        message='Subtitle translation page.',
-        subtitle=st
     )
 
 @app.route('/about')
