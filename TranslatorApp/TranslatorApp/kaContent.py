@@ -5,6 +5,7 @@ from flask import (
     Blueprint, flash, g, redirect, render_template, make_response, request, session
 )
 import requests
+from html import unescape
 from TranslatorApp import Configuration
 
 import pymysql
@@ -30,19 +31,31 @@ class User(object):
         #Load UserName From Database
         sql = "select * from %s.`wp_users` where user_login='%s'" % (Configuration.dbDatabase, self.name)
         print(sql)
+        cursor = self.dbConnection.cursor()
+        cursor.execute(sql)
+        result = dict(cursor.fetchone())
         #To be finished get the UserID, then load the permissions from wp_usermetadata in wp_capabilities and wp_user_level (Level 10 = administrator)
+        ID = result['ID']
+        permSQL = "select * from wp_usermeta where user_id='%s' and meta_key='wp_user_level'" % ID
+        cursor.execute(permSQL)
+        result = dict(cursor.fetchone())
+        user_level = int(result['meta_value'])
+        if (user_level >= 10):
+            self.role = 'administrator'
+        else:
+            self.role = user_level 
 
     #Note: This should be made more secure by validating the Hash Values in the Fields
     def checkUserCookie(self):
         #Function checks if the UserCookie exists and loads permission from DB
         for cookie in request.cookies:
-          
             #Check if the cookie matches a substring
             if (cookie[:20] == 'wordpress_logged_in_'):
                 #explode value by |
-                cookieFields = request.cookies.get(cookie).split('|')
+                #Replace escaped pipesymbol
+                cookieFields = request.cookies.get(cookie).replace('%7C','|').split('|')
                 self.name = cookieFields[0]
-                self.role = 'none'
+                self.role = ''
 
                 self.loadRoleFromDB()
 
@@ -128,7 +141,8 @@ class KAContent(object):
             year=datetime.now().year,
             filter=domainFilter,
             message=self.message,
-            user=self.user
+            user=self.user,
+            baseURL=Configuration.baseURL
         ))                             
 
 
