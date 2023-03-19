@@ -165,6 +165,10 @@ def content():
 def saveData(id):
     v = KAContent()
 
+    if ( not v.user.isAdmin()):
+        print("Error: User does not have proper permissions")
+        return ""
+    
     data = {}
     rData = request.get_json()
     
