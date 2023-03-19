@@ -15,7 +15,7 @@
     }
 </script>
 
-{% if user['name'] <> '' %}
+{% if user['name'] != '' %}
 <p>You are logged in as "{{ user['name'] }}" as {{ user['role'] }}</p>
 {% endif %}
 <h2>
