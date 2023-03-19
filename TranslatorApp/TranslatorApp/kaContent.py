@@ -90,7 +90,6 @@ class KAContent(object):
 
             where = []
 
-            print(user)
             if (user != None and user != ''):
                 where.append("translator = '%s'" % user)
                 if (not showAll):
@@ -118,7 +117,7 @@ class KAContent(object):
             if (len(where)>0):
                 sql = sql + " where " + " AND ".join(where)
 
-            print(sql)
+            #print(sql)
 
             cursor.execute(sql)
             result = cursor.fetchall()
