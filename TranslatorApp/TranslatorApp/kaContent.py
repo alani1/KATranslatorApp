@@ -105,7 +105,7 @@ class KAContent(object):
 
             if (filter == "computing"):
                 where.append("domain = 'computing'")
-                where.append("course in ('computer-programming', 'computer-science')")
+                where.append("course in ( 'hour-of-code', 'computer-programming', 'computer-science')")
             
             #Always filter for Videos which are neither dubbed nor subbed
             if (True):
