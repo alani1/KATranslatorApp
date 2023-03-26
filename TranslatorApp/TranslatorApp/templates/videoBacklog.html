@@ -50,6 +50,7 @@
 <h2>
     {% if user != '' %}
     <a href="?user={{ user['name'] }}" onclick="return showBacklog('{{ user['name'] }}')">My Backlog</a>,
+    <a href="?filter=approval" onclick="return setFilter('approval')">Approval</a>, 
     {% endif %}
     <a href="?filter=math13" onclick="return setFilter('math16')">Math 1-6</a>, <a href="?filter=math713" onclick="return setFilter('math713')">Math 7-13</a>, <a href="?filter=computing" onclick="return setFilter('computing')">Computing</a>
 

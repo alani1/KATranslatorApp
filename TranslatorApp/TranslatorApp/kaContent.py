@@ -90,12 +90,18 @@ class KAContent(object):
 
             where = []
 
+            #When user specified show only this users Backlog
             if (user != None and user != ''):
                 where.append("translator = '%s'" % user)
                 if (not showAll):
                     where.append("(translation_status = '' or translation_status = 'Assigned')")
-            elif not showAll:
+            
+            #Limit to not Translated Videos unless showAll is specified or "approval-backlog"
+            elif not showAll and filter != 'approval':
                 where.append("(translation_status = '' or translation_status is NULL)")
+
+            if (filter == "approval"):
+                where.append("(translation_status = 'Translated')")
 
             if (filter == "math16"):
                 where.append("course in ('cc-kindergarten-math', 'cc-1st-grade-math', 'cc-2nd-grade-math', 'cc-third-grade-math', 'cc-fourth-grade-math', 'cc-fifth-grade-math', 'cc-sixth-grade-math')")
@@ -117,7 +123,7 @@ class KAContent(object):
             if (len(where)>0):
                 sql = sql + " where " + " AND ".join(where)
 
-            #print(sql)
+            print(sql)
 
             cursor.execute(sql)
             result = cursor.fetchall()
@@ -182,7 +188,7 @@ def content():
     #Create Blueprint Object
     v = KAContent()
 
-    valid_filters = [ 'math16', 'math713', 'computing'] # List of valid filter parameters
+    valid_filters = [ 'math16', 'math713', 'computing', 'approval'] # List of valid filter parameters
     filter = ""
     iFilter = request.args.get('filter')
     if iFilter in valid_filters:
