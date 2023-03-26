@@ -81,6 +81,10 @@ class KAContent(object):
                     cursorclass=pymysql.cursors.DictCursor)
 
     def focusCourseCondition(self, course):
+
+        if not course in Configuration.focusCourses:
+            return ''
+
         courses = Configuration.focusCourses[course]
 
         cCourses = []
