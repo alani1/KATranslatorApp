@@ -33,7 +33,7 @@
                     <li><a href="{{ url_for('home') }}">Home</a></li>
                     <li><a href="{{ url_for('KAContent.videoBacklog') }}">Backlog</a></li>
                     <li><a href="{{ url_for('Subtitles.subtitles') }}">Untertitel</a></li>
-                    {% if user == '' %}
+                    {% if user['name'] == '' %}
                     <li><a target="_blank" href="/wp-admin">Login</a></li>
                     {% endif %}
                     <li><a href="{{ url_for('about') }}">Contact</a></li>

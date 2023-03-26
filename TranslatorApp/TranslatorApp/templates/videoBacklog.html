@@ -48,7 +48,7 @@
     <label class="form-check-label" for="flexSwitchCheckDefault">Show All</label>
 </div>
 <h2>
-    {% if user != '' %}
+    {% if user['name'] != '' %}
     <a href="?user={{ user['name'] }}" onclick="return showBacklog('{{ user['name'] }}')">My Backlog</a>,
     <a href="?filter=approval" onclick="return setFilter('approval')">Approval</a>, 
     {% endif %}
