@@ -195,7 +195,6 @@
             {
                 id: "Actions", name: "Actions",
                 formatter: (cell, row) => {
-                    console.log(row.cells[7].data);
                     // Only show action buttons if the user is logged in on KADE
                     return gridjs.html(
                         `<a target="_blank" href="${row.cells[1].data}"><button class="btn btn-primary">KA</button></a>&nbsp;` +

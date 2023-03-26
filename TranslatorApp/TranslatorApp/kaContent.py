@@ -80,6 +80,14 @@ class KAContent(object):
                     charset='utf8mb4',
                     cursorclass=pymysql.cursors.DictCursor)
 
+    def focusCourseCondition(self, course):
+        courses = Configuration.focusCourses[course]
+
+        cCourses = []
+        for c in courses:
+            cCourses.append("'%s'" % c)
+
+        return ', '.join(cCourses)
 
     #Load Data from Content Database
     def loadData(self,user, filter, showAll=False):
@@ -99,24 +107,28 @@ class KAContent(object):
             #Limit to not Translated Videos unless showAll is specified or "approval-backlog"
             elif not showAll and filter != 'approval':
                 where.append("(translation_status = '' or translation_status is NULL)")
-
+            
+            #build filterCondtion for focus courses
+            filterCondition = self.focusCourseCondition(filter)
             if (filter == "approval"):
                 where.append("(translation_status = 'Translated')")
 
             if (filter == "math16"):
-                where.append("course in ('cc-kindergarten-math', 'cc-1st-grade-math', 'cc-2nd-grade-math', 'cc-third-grade-math', 'cc-fourth-grade-math', 'cc-fifth-grade-math', 'cc-sixth-grade-math')")
+                where.append("course in (%s)" % filterCondition)
             
             if (filter == "math713"):
-                where.append("course in ('cc-seventh-grade-math', 'cc-eigth-grade-math')")
+                where.append("course in (%s)" % filterCondition)
 
             if (filter == "computing"):
                 where.append("domain = 'computing'")
-                where.append("course in ( 'hour-of-code', 'computer-programming', 'computer-science')")
+                where.append("course in (%s)" % filterCondition)
             
             #Always filter for Videos which are neither dubbed nor subbed
             if (True):
                 #where.append("backlog='1'")
                 where.append("(kind='Video' or kind='Talkthrough')")
+
+            if ( not showAll):
                 where.append("dubbed='False'")
                 where.append("subbed='False'")
 
