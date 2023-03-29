@@ -195,6 +195,11 @@
             {
                 id: "Actions", name: "Actions",
                 formatter: (cell, row) => {
+                    //Change link if Content is not published
+                    if (row.cells[13].data == 'False') {
+                        row.cells[1].data = row.cells[1].data.replace('https://de.', 'https://www.');                        
+                    }
+
                     // Only show action buttons if the user is logged in on KADE
                     return gridjs.html(
                         `<a target="_blank" href="${row.cells[1].data}"><button class="btn btn-primary">KA</button></a>&nbsp;` +

@@ -139,7 +139,7 @@ class KAContent(object):
             if (len(where)>0):
                 sql = sql + " where " + " AND ".join(where)
 
-            print(sql)
+            #print(sql)
 
             cursor.execute(sql)
             result = cursor.fetchall()

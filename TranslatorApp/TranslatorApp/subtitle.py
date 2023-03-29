@@ -27,6 +27,7 @@ class Subtitles(object):
         self.amaraAPI = ""
         self.force = False
         self.subtitleInfo = ""
+        self.enSubtitle = ""
         self.message = "what is the message123??"
 
         if len(YTid) > 0:
@@ -140,14 +141,17 @@ class Subtitles(object):
                 title = vid['title']
                 description = vid['description']
 
-                #get the English subtitle
-                ensubURL = "https://amara.org/api/videos/" + amaraID + "/languages/en/subtitles/?format=txt"
-                enSubtitle = requests.get(ensubURL)
+                #get the English subtitle if it is empty to avoid repeated calls
+                if ( not self.enSubtitle is object):
+                    ensubURL = "https://amara.org/api/videos/" + amaraID + "/languages/en/subtitles/?format=txt"
+                    self.enSubtitle = requests.get(ensubURL)
 
-                self.subtitleInfo = "<table class='table'><tr><td>Translating Video</td><td><b>" + title + "</b></td></tr>" \
-                "<tr><td># Characters</td><td>" + str(len(title)+len(description)+len(enSubtitle.content)) + '</td></tr>' \
-                "<tr><td>Deepl Chars Left</td><td>" + self.getDeeplUsage() +"</td></tr>" \
-                "<tr><td>Amara ID</td><td>" + amaraID + "</td></tr></table>" + getAmaraEditorLink(amaraID)
+                    self.subtitleInfo = "<table class='table'><tr><td>Translating Video</td><td><b>" + title + "</b></td></tr>" \
+                    "<tr><td># Characters</td><td>" + str(len(title)+len(description)+len(self.enSubtitle.content)) + '</td></tr>' \
+                    "<tr><td>Deepl Chars Left</td><td>" + self.getDeeplUsage() +"</td></tr>" \
+                    "<tr><td>Amara ID</td><td>" + amaraID + "</td></tr></table>" + getAmaraEditorLink(amaraID)
+
+                    print("Request to Deepl, request to Amara for %s" % amaraID)
 
                 #Select only Videos from Team Khan-Academy 
                 if (vid['team'] == "khan-academy"):
