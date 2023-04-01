@@ -158,6 +158,14 @@
                 formatter: (cell) => gridjs.html(`<b>${cell}</b>`)
             },
             {
+                id: "duration", field: "duration", name: "Duration",
+                formatter: (cell) => {
+                    var min = Math.floor(cell / 60);
+                    var sec = cell % 60;
+                    return gridjs.html(min + `:` + sec);
+                }
+            },
+            {
                 id: "dubbed", field: "dubbed", name: "dubbed",
                 formatter: (value) => {
                     if (value == 'True') {
@@ -204,7 +212,7 @@
                 id: "Actions", name: "Actions",
                 formatter: (cell, row) => {
                     //Change link if Content is not published
-                    if (row.cells[13].data == 'False') {
+                    if (row.cells[14].data == 'False') {
                         row.cells[1].data = row.cells[1].data.replace('https://de.', 'https://www.');                        
                     }
 
@@ -216,35 +224,35 @@
                     buttons += `<button type="button" class="btn btn-primary" data-toggle="tooltip" data-placement="top" title="Edit" onclick="
                             $('#modalTitelLabel').text('`+ row.cells[7].data.replace(/"/g, '').replace(/\'/g, '') + `');
                             $('#id').val('${row.cells[0].data}');
-                            $('#translator').val('${row.cells[10].data}');
+                            $('#translator').val('${row.cells[11].data}');
 
                             //Automatically set date to today if it is null, else take from DB
-                            if ('${row.cells[11].data}' == 'null') {
+                            if ('${row.cells[12].data}' == 'null') {
                                 $('#translationDate').val(new Date().toISOString().slice(0, 10));
                             } else {
-                                $('#translationDate').val(new Date('${row.cells[11].data}').toISOString().slice(0, 10));
+                                $('#translationDate').val(new Date('${row.cells[12].data}').toISOString().slice(0, 10));
                             }
-                            $('#translationStatus').val('${row.cells[12].data}');
+                            $('#translationStatus').val('${row.cells[13].data}');
                             
                             //Needs some debugging
-                            if('${row.cells[14].data}' == '') {
+                            if('${row.cells[15].data}' == '') {
                                 console.log('DEBUG: comment is empty');
                             }
                             
-                            $('#translationComment').text('${row.cells[14].data}');
+                            $('#translationComment').text('${row.cells[15].data}');
 
-                            if ( '${row.cells[8].data}' == 'True') {
+                            if ( '${row.cells[9].data}' == 'True') {
                                 $('#dubbed').prop('checked', true);
                             }
 
-                            if ( '${row.cells[9].data}' == 'True') {
+                            if ( '${row.cells[10].data}' == 'True') {
                                 $('#dubbed').prop('checked', true);
                             }
 
                             $('#editModal').modal('show');"><i class="fa-solid fa-pen-to-square"></i></button>&nbsp`;
                         {% endif %}
                         {% if user.isContributor() %}
-                        if (row.cells[10].data == null) {
+                        if (row.cells[11].data == null) {
                             buttons += `<button class="btn btn-primary" data-toggle="tooltip" data-placement="top" title="Assign to yourself" onclick="AssigntoUser('${row.cells[0].data}');"><i class="fa fa-user-plus"></i></button>`;
                         }
                         {% endif %}
