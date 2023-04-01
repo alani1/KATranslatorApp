@@ -136,6 +136,7 @@ class Subtitles(object):
         #make this more robust to handle when no result is found
         if ( response["meta"]["total_count"] > 0 and response.get('objects') != None and len(response['objects']) > 0):
             #iterate as there may be multiple IDs and find the khan-academy team
+            print("Gugugs")
             for vid in response['objects']:
                 amaraID = vid['id']
                 title = vid['title']
@@ -146,12 +147,13 @@ class Subtitles(object):
                     ensubURL = "https://amara.org/api/videos/" + amaraID + "/languages/en/subtitles/?format=txt"
                     self.enSubtitle = requests.get(ensubURL)
 
+
                     self.subtitleInfo = "<table class='table'><tr><td>Translating Video</td><td><b>" + title + "</b></td></tr>" \
                     "<tr><td># Characters</td><td>" + str(len(title)+len(description)+len(self.enSubtitle.content)) + '</td></tr>' \
                     "<tr><td>Deepl Chars Left</td><td>" + self.getDeeplUsage() +"</td></tr>" \
                     "<tr><td>Amara ID</td><td>" + amaraID + "</td></tr></table>" + getAmaraEditorLink(amaraID)
 
-                    print("Request to Deepl, request to Amara for %s" % amaraID)
+                    
 
                 #Select only Videos from Team Khan-Academy 
                 if (vid['team'] == "khan-academy"):
@@ -173,13 +175,13 @@ class Subtitles(object):
                             subInfo = subResult.json()
                          
                             if ( not subInfo["subtitles_complete"] ):
-                                return self.translateSubtitleAndSubmit(enSubtitle, vid, subInfo["published"], subInfo["subtitle_count"])        
+                                return self.translateSubtitleAndSubmit(self.enSubtitle, vid, subInfo["published"], subInfo["subtitle_count"])        
 
                             else:
                                 self.message = "This Subtitle has already been translated to German"
                                 return ""
                 
-                    return self.translateSubtitleAndSubmit(enSubtitle, vid, False, 0)
+                    return self.translateSubtitleAndSubmit(self.enSubtitle, vid, False, 0)
 
             self.message = "<b>Error, Khan Academy Team not found," + amaraID
 
