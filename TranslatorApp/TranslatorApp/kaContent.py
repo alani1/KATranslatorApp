@@ -93,6 +93,18 @@ class KAContent(object):
 
         return ', '.join(cCourses)
 
+    # Load all users with permission contributore (1 or higher)
+    def getUsers(self):
+
+        with self.dbConnection.cursor() as cursor:
+            sql = "SELECT user_nicename FROM %s.wp_users, %s.wp_usermeta WHERE wp_users.id = wp_usermeta.user_id AND wp_usermeta.meta_key='wp_user_level' AND wp_usermeta.meta_value > 0 ORDER BY user_login" % (Configuration.dbDatabase,Configuration.dbDatabase)
+            print(sql)
+            cursor.execute(sql)
+            result = cursor.fetchall()
+            print("all users")
+            print(result)
+            return result
+
     #Load Data from Content Database
     def loadData(self,user, filter, showAll=False):
 
@@ -181,12 +193,14 @@ class KAContent(object):
             userFilter=userFilter,
             message=self.message,
             user=self.user,
+            users=self.getUsers(),
             baseURL=Configuration.baseURL
         ))                             
 
 
 
 #Handle parameters filter="math13,math713, computing" backlog=ignore
+#Generate HTML with List and Edit Dialog
 kabp = Blueprint('KAContent', __name__, url_prefix='/content')   
 @kabp.route('/', methods = ['GET', 'POST'])
 def videoBacklog():
@@ -198,6 +212,7 @@ def videoBacklog():
 
     return v.render()
 
+#genrate json with all filtered content
 @kabp.route('/data', methods = ['GET'])
 def content():
 
