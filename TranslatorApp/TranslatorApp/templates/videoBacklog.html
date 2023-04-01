@@ -162,6 +162,8 @@
                 formatter: (cell) => {
                     var min = Math.floor(cell / 60);
                     var sec = cell % 60;
+                    sec = (sec < 10 ? "0" : "") + sec;
+
                     return gridjs.html(min + `:` + sec);
                 }
             },
