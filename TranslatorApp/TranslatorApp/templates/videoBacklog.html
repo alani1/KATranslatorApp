@@ -206,12 +206,12 @@
                     }
 
                     // Only show action buttons if the user is logged in on KADE
-                    return gridjs.html(
-                        `<a target="_blank" href="${row.cells[1].data}"><button class="btn btn-primary">KA</button></a>&nbsp;` +
-                        `<a target="_blank" href="{{baseURL}}/subtitles/${row.cells[2].data}"><button class="btn btn-primary">SUB</button></a>&nbsp`
+                    var buttons =
+                        `<a target="_blank" href="${row.cells[1].data}"><button class="btn btn-primary"data-toggle="tooltip" data-placement="top" title="Open on Khan Academy"><i class="fa-brands fa-leanpub"></i></button></a>&nbsp;` +
+                        `<a target="_blank" href="{{baseURL}}/subtitles/${row.cells[2].data}"><button class="btn btn-primary" data-toggle="tooltip" data-placement="top" title="Subtitle on Amara"><i class="fa-solid fa-closed-captioning"></i></button></a>&nbsp`;
                         {% if user.isAdmin() %}
-                        + `<button type="button" class="btn btn-primary" onclick="
-                            $('#modalTitelLabel').text('`+row.cells[7].data.replace(/"/g, '').replace(/\'/g, '')+`');
+                    buttons += `<button type="button" class="btn btn-primary" data-toggle="tooltip" data-placement="top" title="Edit" onclick="
+                            $('#modalTitelLabel').text('`+ row.cells[7].data.replace(/"/g, '').replace(/\'/g, '') + `');
                             $('#id').val('${row.cells[0].data}');
                             $('#translator').val('${row.cells[10].data}');
 
@@ -238,9 +238,16 @@
                                 $('#dubbed').prop('checked', true);
                             }
 
-                            $('#editModal').modal('show');">Edt</button>`
+                            $('#editModal').modal('show');"><i class="fa-solid fa-pen-to-square"></i></button>&nbsp`;
                         {% endif %}
-                    )
+                        {% if user.isContributor() %}
+                        console.log("trans:'" + row.cells[10].data+"'")
+                        if (row.cells[10].data == null) {
+                            buttons += `<button class="btn btn-primary" data-toggle="tooltip" data-placement="top" title="Assign to yourself" onclick="AssigntoUser('${row.cells[0].data}');"><i class="fa fa-user-plus"></i></button>`;
+                        }
+                        {% endif %}
+
+                    return gridjs.html(buttons);
                     // Link to Translation Portal 1stID is the Domain, second ID is the Course
                     // https://de.khanacademy.org/devadmin/translations/xff10333bf599f93a/xffde7c31/?
 
@@ -259,6 +266,20 @@
 
 
     }).render(document.getElementById("table"));
+
+    function AssigntoUser(id) {
+        $.ajax({
+            type: "POST",
+            url: '{{baseURL}}/content/assign/' + id,
+            contentType: "application/json",
+            success: function (response) {
+                myGrid.forceRender();
+            },
+            error: function (xhr, status, error) {
+                alert("Error: " + error);
+            }
+        });
+    }
 
     function saveTranslator() {
         var id = $("#id").val();

@@ -17,21 +17,27 @@ class User(object):
         self.dbConnection = dbConnection
         self.name = ''
         self.role = ''
+        self.user_level = 0
 
         if Configuration.mode == 'dev':
             self.name = Configuration.devUser
             self.role = 'administrator'
             self.user_level = 10
-        else:
-            self.checkUserCookie()
+        
+        # Loads the UserName from Cookie
+        self.checkUserCookie()
+        self.loadRoleFromDB()
 
     def isAdmin(self):
-        return self.role == 'administrator'
+        return self.user_level >= 10
+
+    def isContributor(self):
+        print("isContributor : %i" % self.user_level)
+        return self.user_level > 0
         
     def loadRoleFromDB(self):
         #Load UserName From Database
         sql = "select * from %s.`wp_users` where user_login='%s'" % (Configuration.dbDatabase, self.name)
-        print(sql)
         cursor = self.dbConnection.cursor()
         cursor.execute(sql)
         result = dict(cursor.fetchone())
@@ -40,11 +46,14 @@ class User(object):
         permSQL = "select * from wp_usermeta where user_id='%s' and meta_key='wp_user_level'" % ID
         cursor.execute(permSQL)
         result = dict(cursor.fetchone())
-        user_level = int(result['meta_value'])
-        if (user_level >= 10):
+        self.user_level = int(result['meta_value'])
+
+        if (self.user_level >= 10):
             self.role = 'administrator'
+        elif (self.user_level >= 1):
+            self.role = 'contributor'
         else:
-            self.role = user_level 
+            self.role = self.user_level 
 
     #Note: This should be made more secure by validating the Hash Values in the Fields
     def checkUserCookie(self):
@@ -57,8 +66,9 @@ class User(object):
                 cookieFields = request.cookies.get(cookie).replace('%7C','|').split('|')
                 self.name = cookieFields[0]
                 self.role = ''
+                return True
 
-                self.loadRoleFromDB()
+        return False
 
 
 class KAContent(object):
@@ -104,6 +114,20 @@ class KAContent(object):
             print("all users")
             print(result)
             return result
+
+    #Check if Video is already assigned to User
+    def ifAssigned(self, id):
+        
+        with self.dbConnection.cursor() as cursor:
+            sql = "SELECT * FROM %s.`ka-content` where id='%s' AND translator IS NULL" % (Configuration.dbDatabase, id)
+
+            cursor.execute(sql)
+            result = cursor.fetchall()
+            
+            if len(result)>0:
+                return False
+
+        return True
 
     #Load Data from Content Database
     def loadData(self,user, filter, showAll=False):
@@ -156,14 +180,14 @@ class KAContent(object):
             cursor.execute(sql)
             result = cursor.fetchall()
         return jsonify(result)
-        
+    
     def saveData(self,data):
         if (len(data)> 0):
 
             self.connectDB()
             cursor = self.dbConnection.cursor()
             sql = "UPDATE %s.`ka-content` SET " % Configuration.dbDatabase + ', '.join(["{} = '{}'".format(k,v) for k,v in data.items()]) + " WHERE id = '%s'" % data['id']
-            #print(sql_statement % ( tuple(data.values()) + (data['id'],)))
+
             cursor.execute(sql)
             self.dbConnection.commit()
             self.dbConnection.close()
@@ -235,6 +259,27 @@ def content():
 
     #Get
     return v.loadData(user, filter, showAll)
+
+@kabp.route('/assign/<id>', methods = ['POST'])
+def assignToUser(id):
+    v = KAContent()
+
+    if ( not v.user.isContributor()):
+        print("Assignment-Error: User does not have proper permissions")
+        return jsonify("")
+    
+    data = {}
+    data['id'] = id
+    data['translator'] = v.user.name
+    data['translation_date'] = datetime.today().strftime("%Y-%m-%d")
+    data['translation_status'] = "Assigned"
+
+    #TODO: Check if the Content Element is not assigned alreay (Status must be empty!)
+    if (v.ifAssigned(id)):
+        print("Error: The Video is already assigned to user")
+        return jsonify("The Video is already assigned to user")
+    else:
+        return v.saveData(data)
 
 @kabp.route('/data/<id>', methods = ['POST'])
 def saveData(id):
