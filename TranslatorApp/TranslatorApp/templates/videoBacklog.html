@@ -40,7 +40,7 @@
     }
 </script>
 
-{% if user['name'] != '' %}
+{% if user.isContributor() %}
 <p>You are logged in as "{{ user['name'] }}" as {{ user['role'] }}</p>
 {% endif %}
 <div class="form-check form-switch">
@@ -48,9 +48,12 @@
     <label class="form-check-label" for="flexSwitchCheckDefault">Show All</label>
 </div>
 <h2>
-    {% if user['name'] != '' %}
+    {% if user.isContributor() %}
     <a href="?user={{ user['name'] }}" onclick="return showBacklog('{{ user['name'] }}')">My Backlog</a>,
-    <a href="?filter=approval" onclick="return setFilter('approval')">Approval</a>, 
+    {% endif %}
+    {% if user.isAdmin() %}
+    <a href="?filter=approval" onclick="return setFilter('approval')">Approval</a>,
+    <a href="?filter=assigned" onclick="return setFilter('assigned')">Assigned</a>,
     {% endif %}
     <a href="?filter=math13" onclick="return setFilter('math16')">Math 1-6</a>, <a href="?filter=math713" onclick="return setFilter('math713')">Math 7-13</a>, <a href="?filter=computing" onclick="return setFilter('computing')">Computing</a>
 
@@ -241,7 +244,6 @@
                             $('#editModal').modal('show');"><i class="fa-solid fa-pen-to-square"></i></button>&nbsp`;
                         {% endif %}
                         {% if user.isContributor() %}
-                        console.log("trans:'" + row.cells[10].data+"'")
                         if (row.cells[10].data == null) {
                             buttons += `<button class="btn btn-primary" data-toggle="tooltip" data-placement="top" title="Assign to yourself" onclick="AssigntoUser('${row.cells[0].data}');"><i class="fa fa-user-plus"></i></button>`;
                         }

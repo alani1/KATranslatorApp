@@ -141,17 +141,22 @@ class KAContent(object):
             #When user specified show only this users Backlog
             if (user != None and user != ''):
                 where.append("translator = '%s'" % user)
+
                 if (not showAll):
                     where.append("(translation_status = '' or translation_status = 'Assigned')")
             
             #Limit to not Translated Videos unless showAll is specified or "approval-backlog"
-            elif not showAll and filter != 'approval':
+            elif (not showAll) and filter != "approval" and filter != "assigned":
                 where.append("(translation_status = '' or translation_status is NULL)")
             
             #build filterCondtion for focus courses
             filterCondition = self.focusCourseCondition(filter)
             if (filter == "approval"):
                 where.append("(translation_status = 'Translated')")
+
+            if (filter == "assigned"):
+                where.append("(translation_status = 'Assigned')")
+
 
             if (filter == "math16"):
                 where.append("course in (%s)" % filterCondition)
@@ -243,7 +248,7 @@ def content():
     #Create Blueprint Object
     v = KAContent()
 
-    valid_filters = [ 'math16', 'math713', 'computing', 'approval'] # List of valid filter parameters
+    valid_filters = [ 'math16', 'math713', 'computing', 'approval', 'assigned'] # List of valid filter parameters
     filter = ""
     iFilter = request.args.get('filter')
     if iFilter in valid_filters:
