@@ -1,0 +1,32 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<h2>{{ title }}.</h2>
+<h3>{{ message|safe }}</h3>
+
+<br />
+
+<h2>Focus Topics</h2>
+
+<table class="table table-striped">
+    <thead><th>Topic</th><th>Revisions</th><th>kWords Total/Todo</th><th>Videos Total/Todo (Dubbed/Subbed)</th><th>Cost</th></thead>
+    {% for tName, topic in courses.items() %}
+    <tr><td>{{ tName }}</td><td></td><td><b>{{ "{:,.2f}".format(topic.words.word_count / 1000) }} / {{ (topic.words.word_count - topic.words.translated_count) / 1000 }}</b></td><td><b>{{ topic.videos.total }} / {{ topic.videos.todo }}</b> ({{ topic.videos.dubbed }} / {{ topic.videos.subbed + topic.videos.sub_translated }})</td>
+
+    <td>{{ "{:,.0f}".format(topic.words.word_count|float * 0.05 + topic.videos.dubbed|int * 80 + (topic.videos.subbed|int + topic.videos.sub_translated|int) * 20) }} Euro</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<hr />
+<h2>Video Translators</h2>
+<table class="table table-striped">
+    <thead>
+    <th>Translator</th><th>Total</th><th>Translated</th><th>Translated Last 30 Days</th><th>Assigned</th><th>AI Dubbed</th><th>Dubbed</th></thead>
+    {% for translator in translators %}
+    <tr><td><a href="{{baseURL}}/content/?user={{ translator.translator }}">{{ translator.translator }}</a></td><td>{{ translator.total }}</td><td>{{ translator.Translated }}</td><td>{{ translator.DAY30 }}</td><td>{{ translator.Assigned }}</td><td>{{ translator.AIDubbed }}</td><td>{{ translator.Dubbed }}</td></tr>
+    {% endfor %}
+</table>
+
+{% endblock %}

@@ -4,10 +4,11 @@ Routes and views for the flask application.
 
 from datetime import datetime
 from flask import render_template
-from TranslatorApp import app, kaContent, subtitle
+from TranslatorApp import app, kaContent, subtitle, statistic
 
 app.register_blueprint(subtitle.bp)
 app.register_blueprint(kaContent.kabp)
+app.register_blueprint(statistic.bp)
 
 @app.route('/')
 @app.route('/home')
