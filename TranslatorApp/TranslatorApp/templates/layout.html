@@ -36,6 +36,7 @@
                     <li><a href="{{ url_for('home') }}">Home</a></li>
                     <li><a href="{{ url_for('KAContent.videoBacklog') }}">Backlog</a></li>
                     <li><a href="{{ url_for('Subtitles.subtitles') }}">Untertitel</a></li>
+                    <li><a href="{{ url_for('KAStatistic.statistic') }}">Stat</a></li>
                     {% if user is defined and user['name']|length == 0 %}
                     <li><a target="_blank" href="/wp-admin">Login</a></li>
                     {% endif %}
