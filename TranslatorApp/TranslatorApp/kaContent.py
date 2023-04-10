@@ -117,8 +117,6 @@ class KAContent(object):
             print(sql)
             cursor.execute(sql)
             result = cursor.fetchall()
-            print("all users")
-            print(result)
             return result
 
     #Check if Video is already assigned to User

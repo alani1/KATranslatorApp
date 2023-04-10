@@ -253,11 +253,6 @@
 
                             $('#editModal').modal('show');"><i class="fa-solid fa-pen-to-square"></i></button>&nbsp`;
                         {% endif %}
-                        {% if user.isContributor() %}
-                        if (row.cells[11].data == null) {
-                            buttons += `<button class="btn btn-primary" data-toggle="tooltip" data-placement="top" title="Assign to yourself" onclick="AssigntoUser('${row.cells[0].data}');"><i class="fa fa-user-plus"></i></button>`;
-                        }
-                        {% endif %}
 
                     return gridjs.html(buttons);
                     // Link to Translation Portal 1stID is the Domain, second ID is the Course

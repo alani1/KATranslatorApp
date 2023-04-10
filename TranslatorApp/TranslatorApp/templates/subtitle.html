@@ -3,7 +3,7 @@
 {% block content %}
 
 <h2>{{ title }}.</h2>
-<h3>{{ message|safe }}</h3>
+<h3 id="msg">{{ message|safe }}</h3>
 
 <br />
 
@@ -11,7 +11,7 @@
 <br />
 <h3>4 Steps to Translate your Video</h3>
 <table>
-    <tr><td><i id="step1-ico" class="fa-regular fa-circle-xmark"></i>&nbsp;&nbsp;</td><td>Enter Video and API-Key</td><td><span id="InstructionStep1">Enter YT Video ID and your Amara API key</span></td></tr>
+    <tr><td><i id="step1-ico" class="fa-regular fa-circle-xmark"></i>&nbsp;&nbsp;</td><td>Enter Video and API-Key</td><td><span id="InstructionStep1">Enter Amara-Key and Youtube-ID</span></td></tr>
     <tr>
         <td><i id="step2-ico" class="fa-regular fa-circle-xmark"></td>
         <td>
@@ -58,23 +58,15 @@
 
     amaraID = "{{ amaraID }}";
     amaraAPI = "{{ amaraAPI }}";
+    YTid = "{{ YTid }}";
     tStep = {{ translationStep }};
 
-
-    // Check if there are already Translations for this Video done
-    function checkTranslationStep3() {
-        console.log("checkTranslationStep3");
-        url = "{{baseURL}}/subtitles/checkSTRequests?language=de&a=" + amaraAPI + "&id=" + amaraID;
-
-
-        return false;
-    }
     // Check if Video is Step
     function checkSteps() {
         step = 0;
 
         refreshCtr++;
-        if (refreshCtr > 20) {
+        if (refreshCtr > 10) {
             clearInterval(refreshId);
             refreshCtr = 0;
         }
@@ -85,7 +77,7 @@
 
         amaraAPI = document.getElementById("amaraAPI").value;
         // Load the Subtitle Request from Amara API trough HTTP Request & Parse JSON
-        url = "/subtitles/checkSTStep?language=de&a=" +amaraAPI + "&id=" + amaraID;
+        url = "/subtitles/checkSTStep?language=de&a=" + amaraAPI + "&id=" + amaraID + "&YTid=" + YTid;
         console.log("loading Subtitle requests from url " + url);
         // Make a request to the Amara API
         fetch(url, {
@@ -125,6 +117,7 @@
         document.forms[0].submit();
     }
 
+    // TODO in every step also update the Message at top of the page
     function updateStepUI(step) {
         console.log("CheckSteps: " + step);
 
@@ -144,8 +137,26 @@
             document.getElementById("InstructionStep1").innerHTML = "Done";
             document.getElementById("InstructionStep2").innerHTML = "Assigned";
             document.getElementById("InstructionStep3").innerHTML = "Pre-Translated";
-
-            //document.getElementById("InstructionStep2").innerHTML = "Review";
+        } else if (step == 4) {
+            document.getElementById("step1-ico").className = "fa-solid fa-circle-check";
+            document.getElementById("step2-ico").className = "fa-solid fa-circle-check";
+            document.getElementById("step3-ico").className = "fa-solid fa-circle-check";
+            document.getElementById("step4-ico").className = "fa-solid fa-circle-check";
+            document.getElementById("InstructionStep1").innerHTML = "Done";
+            document.getElementById("InstructionStep2").innerHTML = "Assigned";
+            document.getElementById("InstructionStep3").innerHTML = "Pre-Translated";
+            document.getElementById("InstructionStep4").innerHTML = "Translated";
+            document.getElementById("msg").innerHTML = "The Subtitle Translation is complete. Waiting for review";
+        } else if (step == 5) {
+            document.getElementById("step1-ico").className = "fa-solid fa-circle-check";
+            document.getElementById("step2-ico").className = "fa-solid fa-circle-check";
+            document.getElementById("step3-ico").className = "fa-solid fa-circle-check";
+            document.getElementById("step4-ico").className = "fa-solid fa-circle-check";
+            document.getElementById("InstructionStep1").innerHTML = "Done";
+            document.getElementById("InstructionStep2").innerHTML = "Assigned";
+            document.getElementById("InstructionStep3").innerHTML = "Pre-Translated";
+            document.getElementById("InstructionStep4").innerHTML = "Reviewed";
+            document.getElementById("msg").innerHTML = "The Subtitle Translation & Review are complete";
         }
 
     }

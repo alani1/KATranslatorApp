@@ -5,6 +5,9 @@ from flask import (
 )
 import requests
 from TranslatorApp import Configuration
+import pymysql
+
+
 
 
 def jprint(obj):
@@ -50,29 +53,98 @@ class Subtitles(object):
             self.force = request.form['force']
 
 
-    def updateVideoStatus(self,status):
-        var = ""
+    def connectDB(self):
+        # Connect to the database
+        self.dbConnection = pymysql.connect(host=Configuration.dbHost,
+                    user=Configuration.dbUser,
+                    password=Configuration.dbPassword,
+                    db=Configuration.dbDatabase,
+                    charset='utf8mb4',
+                    cursorclass=pymysql.cursors.DictCursor)
+
+    #Lookup the WP username
+    def getDBUserName(self,amaraUser):
+        sql = "SELECT wp_users.user_login as user FROM wp_users, wp_usermeta WHERE wp_usermeta.user_id = wp_users.ID AND wp_usermeta.meta_key='googleplus' AND wp_usermeta.meta_value='%s'" % amaraUser
+        cursor = self.dbConnection.cursor()
+        cursor.execute(sql)
+        result = cursor.fetchall()
+        if (len(result) >0):
+            return result[0]['user']
+        else:
+            return amaraUser
+
+    def updateVideoStatus(self,stRequest):
+        
+        self.connectDB()
+
+        #1. Check if User is allowed to update the status e.g. Contributor
+        #For this need to refactor User into own module
+        #if ( not v.user.isContributor()):
+        #    print("Assignment-Error: User does not have proper permissions")
+        #    return jsonify("")
+    
+        #2. Update the status in the DB
+
+        data = {}
+        data['youtube_id'] = self.YTid
+        status = stRequest['work_status']
+        translator = self.getDBUserName(stRequest['subtitler']['username'])
+        
+        cursor = self.dbConnection.cursor()
+        sql = "SELECT * FROM %s.`ka-content` " % Configuration.dbDatabase + " WHERE youtube_id = '%s'" % data['youtube_id']
+        cursor.execute(sql)
+        result = cursor.fetchall()
+        if (len(result) == 0):
+            print("ERROR No result for SQL: " + sql)
+            return;
+        
+        current = result[0]
+        #print(current)
+
+        #Always update Status / Date / Translator when status is empty
+        if current['translation_status'] == None:
+            data['translator'] = translator
+            if (status == 'being-subtitled'):
+                data['translation_status'] = 'Assigned'
+            elif (status == 'needs-reviewer'):
+                data['translation_status'] = 'Translated'
+
+            data['translation_date'] = datetime.today().strftime("%Y-%m-%d")
+
+        #Current Status is Assigned -> set to Translated
+        if status == 'needs-reviewer' and current['translation_status'] == 'Assigned':
+            data['translator'] = translator
+            data['translation_status'] = 'Translated'
+            data['translation_date'] = datetime.today().strftime("%Y-%m-%d")
+
+        #Current Status is Translated -> set to Approved
+        if status == 'complete' and ( current['translation_status'] == 'Assigned' or current['translation_status'] == 'Translated'):
+            data['translation_status'] = 'Approved'
+        
+        sql = "UPDATE %s.`ka-content` SET " % Configuration.dbDatabase + ', '.join(["{} = '{}'".format(k,v) for k,v in data.items()]) + " WHERE youtube_id = '%s'" % data['youtube_id'] + " AND (translator is NULL OR translator = '%s')" % translator
+
+        #print(sql)
+        cursor.execute(sql)
+        self.dbConnection.commit()
+        self.dbConnection.close()
 
 
-    def checkSTStep(self, amaraID):
-        self.amaraID = amaraID
+
+    def checkSTStep(self):
 
         url = "https://amara.org/api/teams/khan-academy/subtitle-requests/?language=de&video=" + self.amaraID
         print(url)
         headers = {'X-api-key': self.amaraAPI} 
-        print(headers)
         response = requests.get(url,headers=headers).json()
 
-        
         if( response.get('objects') != None and len(response['objects']) > 0):
             status = response['objects'][0]['work_status']
-            subtitler = response['objects'][0]['subtitler']
 
             #TODO improve: check if subtitle request is assigned to me (AMARA UserID), MetaDataField: googleplus
             if (status == "being-subtitled"):
 
                 #Subtitle is in progress on Amara, update the status in DB
-                self.updateVideoStatus("Assigned")
+                self.updateVideoStatus(response['objects'][0])
 
                 #Check if we are in Step 3 e.g. are there already translated Versions of the subtitle
                 if ( self.hasGermanSubtitles()):
@@ -81,6 +153,16 @@ class Subtitles(object):
                     result = { 'result': 3 }
                 else:
                     result = { 'result': 2 }
+            elif (status == "needs-reviewer"):
+                #Subtitle is in progress on Amara, update the status in DB
+                self.updateVideoStatus(response['objects'][0])
+
+                result = { 'result': 4 }
+            elif (status == "complete"):
+                #Subtitle is in progress on Amara, update the status in DB
+                self.updateVideoStatus(response['objects'][0])
+
+                result = { 'result': 5 }
             else:
                 result = { 'result': 1 }
         else:
@@ -279,6 +361,9 @@ class Subtitles(object):
 
                     deTitle = self.deeplTranslate(title).json()["translations"][0]["text"]
                     deDescription = self.deeplTranslate(description).json()["translations"][0]["text"]
+                    deDescription = deDescription.replace("https://www.khanacademy.org", "https://de.khanacademy.org")
+                    deDescription += "\n\nDie deutschen Untertitel fuer dieses Video wurden vom Team KA Deutsch e.V. erstellt. Wir brauchen deine Unterstuetzung. https://www.kadeutsch.org"
+                    
 
                     result = self.addNewSubtitle(amaraID, deSubtitle, deTitle, deDescription)
                     self.message = "Sucessfully translated. Change to Amara Tab to Review, Edit and Publish"
@@ -291,7 +376,7 @@ class Subtitles(object):
                 self.message = "<b>There are already versions of this Video, please Review, Edit and Publish</b>" 
                 self.translationStep = 4
         else:
-            self.message = '<b>Please Assign this Video to yourself by clicking on Translate Button<br/>' + str(getAmaraVideoLink(amaraID))  
+            self.message = '<b>Please Assign this Video to yourself by clicking on translate link</b><br/>' + str(getAmaraVideoLink(amaraID))  
             self.translationStep = 2
 
 
@@ -311,22 +396,23 @@ def after_request(response):
 
 @bp.route('/checkSTStep', methods = ['GET', 'POST'])
 def checkSTStep():
+    st = Subtitles()
 
     amaraAPI = ""
     amaraID = ""
     if 'a' in request.args:
-        amaraAPI = request.args.get('a')
+        st.amaraAPI = request.args.get('a')
         
     if 'id' in request.args:
-        amaraID = request.args.get('id')
+        st.amaraID = request.args.get('id')
 
-    if (amaraAPI == "" or amaraID == ""):
+    if 'YTid' in request.args:
+        st.YTid = request.args.get('YTid')
+
+    if (st.amaraAPI == "" or st.amaraID == ""):
         return "Error"
     else:
-
-        st = Subtitles()
-        st.amaraAPI = amaraAPI
-        return st.checkSTStep(amaraID)
+        return st.checkSTStep()
 
 @bp.route('/', methods = ['GET', 'POST'])
 @bp.route('/<YTid>', methods = ['GET', 'POST'])
