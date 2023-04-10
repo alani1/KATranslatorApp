@@ -77,7 +77,7 @@
 
         amaraAPI = document.getElementById("amaraAPI").value;
         // Load the Subtitle Request from Amara API trough HTTP Request & Parse JSON
-        url = "/subtitles/checkSTStep?language=de&a=" + amaraAPI + "&id=" + amaraID + "&YTid=" + YTid;
+        url = "{{baseURL}}/subtitles/checkSTStep?language=de&a=" + amaraAPI + "&id=" + amaraID + "&YTid=" + YTid;
         console.log("loading Subtitle requests from url " + url);
         // Make a request to the Amara API
         fetch(url, {
