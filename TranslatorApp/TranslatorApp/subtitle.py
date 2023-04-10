@@ -102,22 +102,23 @@ class Subtitles(object):
         #print(current)
 
         #Always update Status / Date / Translator when status is empty
+        #TODO take Date/Time from stRequest
         if current['translation_status'] == None:
             data['translator'] = translator
             if (status == 'being-subtitled'):
                 data['translation_status'] = 'Assigned'
-            elif (status == 'needs-reviewer'):
+            elif (status == 'needs-reviewer' or status == 'beeing-reviewed'):
                 data['translation_status'] = 'Translated'
 
             data['translation_date'] = datetime.today().strftime("%Y-%m-%d")
 
-        #Current Status is Assigned -> set to Translated
-        if status == 'needs-reviewer' and current['translation_status'] == 'Assigned':
+        #Current Status is Assigned but should be "Translated" because is alreay in review status
+        if (status == 'needs-reviewer' or status == 'beeing-reviewed') and current['translation_status'] == 'Assigned':
             data['translator'] = translator
             data['translation_status'] = 'Translated'
             data['translation_date'] = datetime.today().strftime("%Y-%m-%d")
 
-        #Current Status is Translated -> set to Approved
+        #Current Status is Translated but should be Approved because it is complete
         if status == 'complete' and ( current['translation_status'] == 'Assigned' or current['translation_status'] == 'Translated'):
             data['translation_status'] = 'Approved'
         
@@ -140,6 +141,7 @@ class Subtitles(object):
         if( response.get('objects') != None and len(response['objects']) > 0):
             status = response['objects'][0]['work_status']
 
+
             #TODO improve: check if subtitle request is assigned to me (AMARA UserID), MetaDataField: googleplus
             if (status == "being-subtitled"):
 
@@ -153,7 +155,7 @@ class Subtitles(object):
                     result = { 'result': 3 }
                 else:
                     result = { 'result': 2 }
-            elif (status == "needs-reviewer"):
+            elif (status == "needs-reviewer" or status == 'beeing-reviewed'):
                 #Subtitle is in progress on Amara, update the status in DB
                 self.updateVideoStatus(response['objects'][0])
 
@@ -389,8 +391,10 @@ bp = Blueprint('Subtitles', __name__, url_prefix='/subtitles')
 
 @bp.after_request 
 def after_request(response):
-    header = response.headers
-    header['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
     # Other headers can be added here if needed
     return response
 
