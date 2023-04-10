@@ -8,15 +8,42 @@
 <br />
 
 <p>{{ subtitleInfo | safe }}</p>
-
+<br />
+<h3>4 Steps to Translate your Video</h3>
+<table>
+    <tr><td><i id="step1-ico" class="fa-regular fa-circle-xmark"></i>&nbsp;&nbsp;</td><td>Enter Video and API-Key</td><td><span id="InstructionStep1">Enter YT Video ID and your Amara API key</span></td></tr>
+    <tr>
+        <td><i id="step2-ico" class="fa-regular fa-circle-xmark"></td>
+        <td>
+            Assign the Video to you on Amara&nbsp;
+        </td>
+        <td>
+            <span id="InstructionStep2">
+                <a target="_blank" onclick="return onAssignClick();" href="https://amara.org/videos/{{ amaraID }}/collaborations/de/join/subtitler/">Assign Subtitle</a>
+            </span>
+        </td>
+    </tr>
+    <tr>
+        <td><i id="step3-ico" class="fa-regular fa-circle-xmark"></td>
+        <td>Pre-Translate the Subtitles</td>
+        <td>
+            <span id="InstructionStep3">
+                Pre-Translate with Deepl
+            </span>
+        </td>
+    </tr>
+    <tr><td><i id="step4-ico" class="fa-regular fa-circle-xmark"></td><td>Finish Translation</td><td><span id="InstructionStep4">Sync & review Translation, then mark as translated</span></td></tr>
+</table>
 <br/>
+{{ amaraEditorLink | safe }}
+<br />
 <hr />
 <form action="{{ url_for('Subtitles.subtitles') }}" method="post">
     <div class="form-group">
-        <label for="amaraAPI">Amara-Key</label> &nbsp;<input name="amaraAPI" type=text value="{{ amaraAPI }}">
+        <label for="amaraAPI">Amara-Key</label> &nbsp;<input id="amaraAPI" name="amaraAPI" type=text value="{{ amaraAPI }}" onchange="checkSteps();">
     </div>
     <div class="form-group">
-        <label for="YTid">Youtube-ID</label> &nbsp;<input name="YTid" type=text value="{{ YTid }}">
+        <label for="YTid">Youtube-ID</label> &nbsp;<input id="YTid" name="YTid" type=text value="{{ YTid }}" onchange="checkSteps();">
     </div>
     <div class="form-group">
         <label for="force">Force Translation</label> &nbsp;<input name="force" type="checkbox">
@@ -24,7 +51,108 @@
     <button type="submit" class="btn btn-primary">Translate</button>
 </form>
 
+<script type="text/javascript">
 
+    var refreshID;
+    var refreshCtr = 0;
+
+    amaraID = "{{ amaraID }}";
+    amaraAPI = "{{ amaraAPI }}";
+    tStep = {{ translationStep }};
+
+
+    // Check if there are already Translations for this Video done
+    function checkTranslationStep3() {
+        console.log("checkTranslationStep3");
+        url = "{{baseURL}}/subtitles/checkSTRequests?language=de&a=" + amaraAPI + "&id=" + amaraID;
+
+
+        return false;
+    }
+    // Check if Video is Step
+    function checkSteps() {
+        step = 0;
+
+        refreshCtr++;
+        if (refreshCtr > 20) {
+            clearInterval(refreshId);
+            refreshCtr = 0;
+        }
+
+        if (document.getElementById("amaraAPI").value.length == 0 || document.getElementById("YTid").value.length == 0) {
+            return 1;
+        }
+
+        amaraAPI = document.getElementById("amaraAPI").value;
+        // Load the Subtitle Request from Amara API trough HTTP Request & Parse JSON
+        url = "/subtitles/checkSTStep?language=de&a=" +amaraAPI + "&id=" + amaraID;
+        console.log("loading Subtitle requests from url " + url);
+        // Make a request to the Amara API
+        fetch(url, {
+            headers: {
+                'X-api-key' : amaraAPI
+            }
+            })
+            .then(response => {
+                // Check if the response was successful
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                // Parse the response as JSON
+                return response.json();
+            })
+            .then(data => {
+                if (typeof data.result !== 'undefined') {
+                    updateStepUI(data.result);
+                }
+            })
+            .catch(error => {
+                // Handle any errors that occurred
+                console.error('Error fetching data:', error);
+            });
+        return step;
+    }
+
+    // Register EventHandler to check every second if Video is assigned
+    function onAssignClick() {
+        console.log("onAssign clicked");
+        refreshId = setInterval(checkSteps, 1000);
+        return true;
+    }
+
+    // Submit the Form to intiate Deepl Translation
+    function submitForm() {
+        document.forms[0].submit();
+    }
+
+    function updateStepUI(step) {
+        console.log("CheckSteps: " + step);
+
+        if (step == 1) {
+            document.getElementById("step1-ico").className = "fa-solid fa-circle-check";
+            document.getElementById("InstructionStep1").innerHTML = "Done";
+        } else if (step == 2) {
+            document.getElementById("step1-ico").className = "fa-solid fa-circle-check";
+            document.getElementById("step2-ico").className = "fa-solid fa-circle-check";
+            document.getElementById("InstructionStep1").innerHTML = "Done";
+            document.getElementById("InstructionStep2").innerHTML = "Assigned";
+            document.getElementById("InstructionStep3").innerHTML = '<button onClick="submitForm();" type="button" class="btn btn-primary">Translate</button>';
+        } else if (step == 3) {
+            document.getElementById("step1-ico").className = "fa-solid fa-circle-check";
+            document.getElementById("step2-ico").className = "fa-solid fa-circle-check";
+            document.getElementById("step3-ico").className = "fa-solid fa-circle-check";
+            document.getElementById("InstructionStep1").innerHTML = "Done";
+            document.getElementById("InstructionStep2").innerHTML = "Assigned";
+            document.getElementById("InstructionStep3").innerHTML = "Pre-Translated";
+
+            //document.getElementById("InstructionStep2").innerHTML = "Review";
+        }
+
+    }
+
+
+    checkSteps()
+</script>
 
 
 {% endblock %}

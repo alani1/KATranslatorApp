@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 from flask import (
-    Blueprint, flash, g, redirect, render_template, make_response, request, session, url_for
+    Blueprint, flash, g, redirect, render_template, make_response, request, jsonify
 )
 import requests
 from TranslatorApp import Configuration
@@ -25,9 +25,11 @@ class Subtitles(object):
     def __init__(self, YTid = ""):
         self.YTid = ""
         self.amaraAPI = ""
+        self.amaraID = ""
         self.force = False
         self.subtitleInfo = ""
         self.enSubtitle = ""
+        self.translationStep = 0
         self.message = "what is the message123??"
 
         if len(YTid) > 0:
@@ -38,7 +40,6 @@ class Subtitles(object):
 
         amaraAPI = request.cookies.get('amaraAPI')
         if (amaraAPI):
-            print("cookie: " + amaraAPI)
             self.amaraAPI = amaraAPI
 
         if 'amaraAPI' in request.form:
@@ -47,6 +48,71 @@ class Subtitles(object):
         if 'force' in request.form:
             self.message = "may the force be with you"
             self.force = request.form['force']
+
+
+    def updateVideoStatus(self,status):
+        var = ""
+
+
+    def checkSTStep(self, amaraID):
+        self.amaraID = amaraID
+
+        url = "https://amara.org/api/teams/khan-academy/subtitle-requests/?language=de&video=" + self.amaraID
+        print(url)
+        headers = {'X-api-key': self.amaraAPI} 
+        print(headers)
+        response = requests.get(url,headers=headers).json()
+
+        
+        if( response.get('objects') != None and len(response['objects']) > 0):
+            status = response['objects'][0]['work_status']
+            subtitler = response['objects'][0]['subtitler']
+
+            #TODO improve: check if subtitle request is assigned to me (AMARA UserID), MetaDataField: googleplus
+            if (status == "being-subtitled"):
+
+                #Subtitle is in progress on Amara, update the status in DB
+                self.updateVideoStatus("Assigned")
+
+                #Check if we are in Step 3 e.g. are there already translated Versions of the subtitle
+                if ( self.hasGermanSubtitles()):
+
+                    #TODO: check if Step 4 is finished e.g. has the subtitle been marked as complete in our DataBase or on Amara --> udpateDB ???
+                    result = { 'result': 3 }
+                else:
+                    result = { 'result': 2 }
+            else:
+                result = { 'result': 1 }
+        else:
+            result = { 'result': 1 }
+    
+        return jsonify(result)
+
+    def hasGermanSubtitles(self):
+
+        subInfoURL = "https://amara.org/api/videos/" + self.amaraID + "/languages/de"
+        headers = {'X-api-key': self.amaraAPI} 
+        subResult = requests.get(subInfoURL,headers=headers)
+        print(subInfoURL)
+        print("hasGermanSubtitles");
+                            
+        if subResult.status_code == 403:
+            self.message = "Please add your Amara API Key, which you can find in your <a target=_new href='https://amara.org/profiles/account'>Amara Account Profile</a>"
+            self.translationStep = 1
+            return False
+
+        subInfo = subResult.json()
+        print(subInfo["subtitles_complete"])
+        print(len(subInfo["versions"]))
+                         
+        if ( subInfo["subtitles_complete"] or len(subInfo["versions"]) > 0 ):
+            print("True")
+            self.message = "This Subtitle has already been translated to German"
+            self.translationStep = 4
+            return True
+        else:
+            return False
+
 
     def render(self):
         
@@ -62,7 +128,11 @@ class Subtitles(object):
             message=self.message,
             subtitleInfo=self.subtitleInfo,
             YTid=self.YTid,
-            amaraAPI=self.amaraAPI
+            amaraAPI=self.amaraAPI,
+            amaraID=self.amaraID,
+            translationStep=self.translationStep,
+            amaraEditorLink=getAmaraEditorLink(self.amaraID),
+            baseURL=Configuration.baseURL,
         ))
 
 
@@ -132,13 +202,15 @@ class Subtitles(object):
         url = "https://amara.org/api/videos/?video_url=https://www.youtube.com/watch?v=" + self.YTid
         headers = {'X-api-key': self.amaraAPI} 
         response = requests.get(url,headers).json()
-        #return jprint(response)
+        
         #make this more robust to handle when no result is found
         if ( response["meta"]["total_count"] > 0 and response.get('objects') != None and len(response['objects']) > 0):
             #iterate as there may be multiple IDs and find the khan-academy team
-            print("Gugugs")
+            
             for vid in response['objects']:
                 amaraID = vid['id']
+                self.amaraID = amaraID;
+
                 title = vid['title']
                 description = vid['description']
 
@@ -151,9 +223,7 @@ class Subtitles(object):
                     self.subtitleInfo = "<table class='table'><tr><td>Translating Video</td><td><b>" + title + "</b></td></tr>" \
                     "<tr><td># Characters</td><td>" + str(len(title)+len(description)+len(self.enSubtitle.content)) + '</td></tr>' \
                     "<tr><td>Deepl Chars Left</td><td>" + self.getDeeplUsage() +"</td></tr>" \
-                    "<tr><td>Amara ID</td><td>" + amaraID + "</td></tr></table>" + getAmaraEditorLink(amaraID)
-
-                    
+                    "<tr><td>Amara ID</td><td>" + amaraID + "</td></tr></table>"
 
                 #Select only Videos from Team Khan-Academy 
                 if (vid['team'] == "khan-academy"):
@@ -164,12 +234,14 @@ class Subtitles(object):
 
                             #Found a German Language for the selected Video
                             #Get detailed information on German Subtitle & check if it is completed
+                            
                             subInfoURL = "https://amara.org/api/videos/" + amaraID + "/languages/de"
                             headers = {'X-api-key': self.amaraAPI} 
                             subResult = requests.get(subInfoURL,headers=headers)
                             
                             if subResult.status_code == 403:
                                 self.message = "Please add your Amara API Key, which you can find in your <a target=_new href='https://amara.org/profiles/account'>Amara Account Profile</a>"
+                                self.translationStep = 1
                                 return "check message"
 
                             subInfo = subResult.json()
@@ -179,6 +251,7 @@ class Subtitles(object):
 
                             else:
                                 self.message = "This Subtitle has already been translated to German"
+                                self.translationStep = 4
                                 return ""
                 
                     return self.translateSubtitleAndSubmit(self.enSubtitle, vid, False, 0)
@@ -209,17 +282,52 @@ class Subtitles(object):
 
                     result = self.addNewSubtitle(amaraID, deSubtitle, deTitle, deDescription)
                     self.message = "Sucessfully translated. Change to Amara Tab to Review, Edit and Publish"
+                    self.translationStep = 4
                 else:
                     self.message = "Error in translation" + result.content()
 
 
             else:
                 self.message = "<b>There are already versions of this Video, please Review, Edit and Publish</b>" 
+                self.translationStep = 4
         else:
             self.message = '<b>Please Assign this Video to yourself by clicking on Translate Button<br/>' + str(getAmaraVideoLink(amaraID))  
+            self.translationStep = 2
+
+
+#TODO: Load AmaraUserID from UserDatabase
+def getAmaraUserID():
+    return ""
 
 
 bp = Blueprint('Subtitles', __name__, url_prefix='/subtitles')
+
+@bp.after_request 
+def after_request(response):
+    header = response.headers
+    header['Access-Control-Allow-Origin'] = '*'
+    # Other headers can be added here if needed
+    return response
+
+@bp.route('/checkSTStep', methods = ['GET', 'POST'])
+def checkSTStep():
+
+    amaraAPI = ""
+    amaraID = ""
+    if 'a' in request.args:
+        amaraAPI = request.args.get('a')
+        
+    if 'id' in request.args:
+        amaraID = request.args.get('id')
+
+    if (amaraAPI == "" or amaraID == ""):
+        return "Error"
+    else:
+
+        st = Subtitles()
+        st.amaraAPI = amaraAPI
+        return st.checkSTStep(amaraID)
+
 @bp.route('/', methods = ['GET', 'POST'])
 @bp.route('/<YTid>', methods = ['GET', 'POST'])
 def subtitles(YTid=""):
@@ -227,3 +335,5 @@ def subtitles(YTid=""):
     #Create Blueprint Object
     st = Subtitles(YTid)
     return st.render()
+
+
