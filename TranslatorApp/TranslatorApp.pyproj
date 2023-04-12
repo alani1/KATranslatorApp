@@ -31,6 +31,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="runserver.py" />
+    <Compile Include="AmaraUpdate.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="TranslatorApp\statistic.py">
       <SubType>Code</SubType>
     </Compile>
