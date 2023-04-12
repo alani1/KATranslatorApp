@@ -4,7 +4,7 @@ import requests
 from datetime import datetime
 import TranslatorApp.Configuration as Configuration
 
-amaraAPI = "bb49c36b73b2cc80e36f7958fcf00a6eecf12037"
+amaraAPI = Configuration.amaraAPI
 
 def lookupYTID(amaraID):
     url = 'https://amara.org/api/videos/%s/' % amaraID
