@@ -1,5 +1,4 @@
 import json
-from turtle import st
 import pymysql
 import requests
 import datetime
