@@ -1,7 +1,8 @@
 import json
+from turtle import st
 import pymysql
 import requests
-from datetime import datetime
+import datetime
 import TranslatorApp.Configuration as Configuration
 
 amaraAPI = Configuration.amaraAPI
@@ -61,8 +62,8 @@ def doSQL(sql):
     dbConnection.commit()
 
 if __name__ == '__main__':
-    limit = 100
-    print("Update KADeutsch Content Database from last %s activities from Amara" % limit)
+    current_datetime = datetime.datetime.now()
+    weekAgo = current_datetime - datetime.timedelta(days=3)
 
     #convert date in form 2023-04-10T18:06:18Z to 2023-04-10
     def convertDate(date):
@@ -86,18 +87,19 @@ if __name__ == '__main__':
     ignored = 0
     unknown = 0
     update = 0
-    url = "https://amara.org/api/teams/khan-academy/activity/?language=de&limit=%s" % limit
+    url = "https://amara.org/api/teams/khan-academy/activity/?language=de&after=%s" % weekAgo.isoformat()
     print(url)
 
 
     headers = {'X-api-key': amaraAPI} 
     response = requests.get(url,headers=headers).json()
 
+    print("Update KADeutsch Content Database with %s activities since %s from Amara" % (len(response['objects']), weekAgo.isoformat()))
+
     for stActivity in reversed(response["objects"]):
 
         video = stActivity["video"]
-        date = stActivity["date"]
-        
+        date = stActivity["date"]        
 
         if stActivity['type'] == 'collab-assign' or stActivity['type'] == 'collab-reassign':
             ytID = lookupYTID(video)
@@ -146,6 +148,24 @@ if __name__ == '__main__':
                     doSQL(sql)
                 else:
                     print('%s Video "%s" already in status Translated' % (date, db[0]['original_title']))
+                    ignored = ignored + 1
+
+        #Change status to reviewed
+        elif stActivity['type'] == 'collab-state-change' and stActivity['state_change'] == 'endorse' and stActivity['role'] == 'reviewer':
+            ytID = lookupYTID(video)
+            db = getDBObjects(ytID)
+            reviewer = getKATranslatorName(stActivity['user']['username'])
+            
+            #Add DB field for reviewer, review_date
+            #sql = "UPDATE `ka-content` SET `translation_status` = 'Approved', `reviewer` = '%s', `review_date` = '%s' WHERE `youtube_id` = '%s'" % ( reviewer, date.split('T')[0], ytID)
+            sql = "UPDATE `ka-content` SET `translation_status` = 'Approved' WHERE `youtube_id` = '%s'" % ( ytID )
+            if len(db) > 0 and not db[0]['translation_status'] == 'Approved':
+                print('%s Video "%s" reviewed by %s' % ( date, db[0]['original_title'], reviewer ))
+                update = update + 1
+                doSQL(sql)
+            else:
+                print('%s Video "%s" already in status Approved' % (date, db[0]['original_title']))
+                ignored = ignored + 1
 
         #ignore these Activity Types
         elif stActivity['type'] == 'version-added' or stActivity['type'] == 'collab-join' or stActivity['type'] == 'collab-unassign' or stActivity['type'] == 'collab-state-change':           
