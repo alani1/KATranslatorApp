@@ -63,7 +63,7 @@ def doSQL(sql):
 
 if __name__ == '__main__':
     current_datetime = datetime.datetime.now()
-    weekAgo = current_datetime - datetime.timedelta(days=3)
+    weekAgo = current_datetime - datetime.timedelta(hours=3)
 
     #convert date in form 2023-04-10T18:06:18Z to 2023-04-10
     def convertDate(date):
