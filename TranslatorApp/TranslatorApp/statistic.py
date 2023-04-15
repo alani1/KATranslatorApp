@@ -55,9 +55,9 @@ def generateCourseStatistic(course):
 
     return courseData
 
-    
+#Generate Statistic per Translator    
 def getTranslatorStatistic():
-    sql = "SELECT translator, COUNT(*) AS total, SUM((translation_status='Approved' OR translation_status='Translated') AND translation_date >= DATE_ADD(NOW(), INTERVAL -30 DAY) ) AS DAY30, SUM(translation_status='Approved' OR translation_status='Translated') AS Translated, SUM(translation_status='Assigned') AS Assigned, SUM(translation_status='AI Dubbed') AS AIDubbed, SUM(translation_status='Native Dubbed') AS Dubbed FROM `ka-content` where translator not in ('None', 'null') GROUP BY translator order by DAY30 DESC"
+    sql = "SELECT translator, COUNT(DISTINCT id) AS total, COUNT(DISTINCT CASE WHEN (translation_status='Approved' OR translation_status='Translated') AND translation_date >= DATE_ADD(NOW(), INTERVAL -30 DAY) THEN id END) AS DAY30, COUNT(DISTINCT CASE WHEN translation_status='Approved' OR translation_status='Translated' THEN id END) AS Translated, COUNT(DISTINCT CASE WHEN translation_status='Assigned' THEN id END) AS Assigned, COUNT(DISTINCT CASE WHEN translation_status='AI Dubbed' THEN id END) AS AIDubbed, COUNT(DISTINCT CASE WHEN translation_status='Native Dubbed' THEN id END) AS Dubbed FROM `ka-content` WHERE translator NOT IN ('None', 'null') GROUP BY translator ORDER BY DAY30 DESC;"
 
     dbConnection = pymysql.connect(host=Configuration.dbHost,
                 user=Configuration.dbUser,

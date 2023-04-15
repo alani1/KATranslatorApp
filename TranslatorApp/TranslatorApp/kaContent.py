@@ -136,6 +136,8 @@ class KAContent(object):
     #Load Data from Content Database
     def loadData(self,user, filter, showAll=False):
 
+        noDuplicates = False
+        
         # Only select Items which are in Backlog        
         with self.dbConnection.cursor() as cursor:
             sql = "SELECT * FROM %s.`ka-content`" % Configuration.dbDatabase
@@ -156,9 +158,11 @@ class KAContent(object):
             #build filterCondtion for focus courses
             filterCondition = self.focusCourseCondition(filter)
             if (filter == "approval"):
+                noDuplicates = True
                 where.append("(translation_status = 'Translated')")
 
             if (filter == "assigned"):
+                noDuplicates = True
                 where.append("(translation_status = 'Assigned')")
 
 
@@ -183,6 +187,10 @@ class KAContent(object):
 
             if (len(where)>0):
                 sql = sql + " where " + " AND ".join(where)
+
+            #Add Group By to avoid duplicates
+            if (noDuplicates):
+                sql = sql + " GROUP BY id"
 
             #print(sql)
 
