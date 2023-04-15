@@ -145,7 +145,10 @@
             document.getElementById("InstructionStep1").innerHTML = "Done";
             document.getElementById("InstructionStep2").innerHTML = "Assigned";
             document.getElementById("InstructionStep3").innerHTML = "Pre-Translated";
-            document.getElementById("InstructionStep4").innerHTML = "Translated";
+            alert("Translated, please Review");
+            url = "https://amara.org/videos/" + amaraID + "/collaborations/de/join/reviewer/";
+            document.getElementById("InstructionStep4").innerHTML = 'Translated, please <a taget="_blank" href="' + url + '">Review</a>';
+
             document.getElementById("msg").innerHTML = "The Subtitle Translation is complete. Waiting for review";
         } else if (step == 5) {
             document.getElementById("step1-ico").className = "fa-solid fa-circle-check";

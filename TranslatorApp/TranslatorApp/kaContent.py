@@ -114,7 +114,6 @@ class KAContent(object):
 
         with self.dbConnection.cursor() as cursor:
             sql = "SELECT user_nicename FROM %s.wp_users, %s.wp_usermeta WHERE wp_users.id = wp_usermeta.user_id AND wp_usermeta.meta_key='wp_user_level' AND wp_usermeta.meta_value > 0 ORDER BY user_login" % (Configuration.dbDatabase,Configuration.dbDatabase)
-            print(sql)
             cursor.execute(sql)
             result = cursor.fetchall()
             return result
