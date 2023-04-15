@@ -87,7 +87,7 @@ if __name__ == '__main__':
     ignored = 0
     unknown = 0
     update = 0
-    url = "https://amara.org/api/teams/khan-academy/activity/?limit=100&language=de&after=%s" % weekAgo.isoformat()
+    url = "https://amara.org/api/teams/khan-academy/activity/?limit=100&language=de&after=%s" % weekAgo.isoformat() + "Z"
     print(url)
 
 

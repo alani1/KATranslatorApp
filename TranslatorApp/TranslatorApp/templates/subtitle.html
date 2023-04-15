@@ -145,7 +145,8 @@
             document.getElementById("InstructionStep1").innerHTML = "Done";
             document.getElementById("InstructionStep2").innerHTML = "Assigned";
             document.getElementById("InstructionStep3").innerHTML = "Pre-Translated";
-            alert("Translated, please Review");
+
+            // TODO: Issue amara returns 302, need to show an error message explaining that the user is not allowed to review
             url = "https://amara.org/videos/" + amaraID + "/collaborations/de/join/reviewer/";
             document.getElementById("InstructionStep4").innerHTML = 'Translated, please <a taget="_blank" href="' + url + '">Review</a>';
 
