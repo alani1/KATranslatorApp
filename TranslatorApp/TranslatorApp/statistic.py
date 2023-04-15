@@ -33,7 +33,7 @@ def generateCourseStatistic(course):
 
     #Get Video Statistics
     sql = "SELECT distinct id, COUNT(*) AS total, SUM(dubbed = 'True') AS dubbed, SUM(subbed = 'True' AND dubbed = 'False') AS subbed,  SUM(translation_status = 'Approved' AND (subbed = 'False' AND dubbed = 'False') ) AS sub_translated FROM `ka-content` WHERE (kind='Video' or kind='Talkthrough') and `course` IN (%s)" % focusCourseCondition(course)
-    print(sql)
+    
     with dbConnection.cursor() as cursor:
         elements = ""
         cursor.execute(sql)
@@ -57,7 +57,7 @@ def generateCourseStatistic(course):
 
 #Generate Statistic per Translator    
 def getTranslatorStatistic():
-    sql = "SELECT translator, COUNT(DISTINCT id) AS total, COUNT(DISTINCT CASE WHEN (translation_status='Approved' OR translation_status='Translated') AND translation_date >= DATE_ADD(NOW(), INTERVAL -30 DAY) THEN id END) AS DAY30, COUNT(DISTINCT CASE WHEN translation_status='Approved' OR translation_status='Translated' THEN id END) AS Translated, COUNT(DISTINCT CASE WHEN translation_status='Assigned' THEN id END) AS Assigned, COUNT(DISTINCT CASE WHEN translation_status='AI Dubbed' THEN id END) AS AIDubbed, COUNT(DISTINCT CASE WHEN translation_status='Native Dubbed' THEN id END) AS Dubbed FROM `ka-content` WHERE translator NOT IN ('None', 'null') GROUP BY translator ORDER BY DAY30 DESC;"
+    sql = "SELECT translator, COUNT(DISTINCT id) AS total, COUNT(DISTINCT CASE WHEN (translation_status='Approved' OR translation_status='Translated') AND translation_date >= DATE_ADD(NOW(), INTERVAL -30 DAY) THEN id END) AS DAY30, COUNT(DISTINCT CASE WHEN translation_status='Approved' OR translation_status='Translated' THEN id END) AS Translated, COUNT(DISTINCT CASE WHEN translation_status='Assigned' THEN id END) AS Assigned, COUNT(DISTINCT CASE WHEN translation_status='AI Dubbed' THEN id END) AS AIDubbed, COUNT(DISTINCT CASE WHEN translation_status='Native Dubbed' THEN id END) AS Dubbed, MAX(translation_date) AS LastActivity FROM `ka-content` WHERE translator NOT IN ('None', 'null', '') GROUP BY translator ORDER BY DAY30 DESC;"
 
     dbConnection = pymysql.connect(host=Configuration.dbHost,
                 user=Configuration.dbUser,
@@ -71,7 +71,6 @@ def getTranslatorStatistic():
         cursor.execute(sql)
         result = cursor.fetchall()
 
-        print(result)
         return result
 
 
@@ -97,7 +96,23 @@ def statistic():
 
     #Translator Statistic
     translators = getTranslatorStatistic()
+    total=0
+    translated=0
+    day30=0
+    assigned=0
+    dubbed=0
+    aidubbed=0
+    
+    for translator in translators:
+        total= total + translator['total']
+        translated= translated + translator['Translated']
+        day30= day30 + translator['DAY30']
+        assigned= assigned + translator['Assigned']
+        dubbed= dubbed + translator['Dubbed']
+        aidubbed= aidubbed + translator['AIDubbed']
 
+    translatorsTotal = {'total': total, 'translated': translated, 'DAY30': day30, 'Assigned': assigned, 'Dubbed': dubbed, 'AIDubbed': aidubbed}
+    
 
     return make_response(render_template(
         'statistic.html',
@@ -106,5 +121,6 @@ def statistic():
         message=message,
         courses=courses,
         translators=translators,
+        translatorsTotal=translatorsTotal,
         baseURL=Configuration.baseURL
 )) 

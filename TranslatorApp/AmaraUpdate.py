@@ -2,6 +2,7 @@ import json
 import pymysql
 import requests
 import datetime
+import math
 import TranslatorApp.Configuration as Configuration
 
 amaraAPI = Configuration.amaraAPI
@@ -86,94 +87,122 @@ if __name__ == '__main__':
     ignored = 0
     unknown = 0
     update = 0
-    url = "https://amara.org/api/teams/khan-academy/activity/?language=de&after=%s" % weekAgo.isoformat()
+    url = "https://amara.org/api/teams/khan-academy/activity/?limit=100&language=de&after=%s" % weekAgo.isoformat()
     print(url)
 
 
     headers = {'X-api-key': amaraAPI} 
     response = requests.get(url,headers=headers).json()
 
+    total = response['meta']['total_count']
+    #get Last page
+    lastOffset = math.floor(total/100)*100
+    url = url + "&offset=%s" % (lastOffset)
+    fetchMore = True
+
     print("Update KADeutsch Content Database with %s activities since %s from Amara" % (len(response['objects']), weekAgo.isoformat()))
 
-    for stActivity in reversed(response["objects"]):
+    while fetchMore:
 
-        video = stActivity["video"]
-        date = stActivity["date"]        
+        print(url)
+        response = requests.get(url,headers=headers).json()
 
-        if stActivity['type'] == 'collab-assign' or stActivity['type'] == 'collab-reassign':
-            ytID = lookupYTID(video)
-            db = getDBObjects(ytID)
-            translator = getKATranslatorName(stActivity['assignee']['username'])
+        if ( response['meta']['offset'] == 0):
+            fetchMore = False
+        else:
+            url = response['meta']['previous']
+
+        for stActivity in reversed(response["objects"]):
+
+            video = stActivity["video"]
+            date = stActivity["date"]        
+
+            if stActivity['type'] == 'collab-assign' or stActivity['type'] == 'collab-reassign':
+                ytID = lookupYTID(video)
+                db = getDBObjects(ytID)
+                # if no db entry, ignore as this video has been deleted from the database
+                if (len(db)== 0):
+                    continue
+                translator = getKATranslatorName(stActivity['assignee']['username'])
             
-            #we only check status of the first object
-            if len(db) > 0 and db[0]['translation_status'] == None and db[0]['translator'] == None:
-                print('%s Video "%s" assigned to %s' % ( date, db[0]['original_title'], translator) )
-                sql = "UPDATE `ka-content` SET `translation_status` = 'Assigned', `translator` = '%s', `translation_date` = '%s' WHERE `youtube_id` = '%s'" % ( translator, date.split('T')[0], ytID)
-                doSQL(sql)
-                update = update + 1
+                #we only check status of the first object
+                if len(db) > 0 and db[0]['translation_status'] == None and db[0]['translator'] == None:
+                    print('%s Video "%s" assigned to %s' % ( date, db[0]['original_title'], translator) )
+                    sql = "UPDATE `ka-content` SET `translation_status` = 'Assigned', `translator` = '%s', `translation_date` = '%s' WHERE `youtube_id` = '%s'" % ( translator, date.split('T')[0], ytID)
+                    doSQL(sql)
+                    update = update + 1
 
-            else:
-                print('%s Video "%s" already assigned to %s' % (date, db[0]['original_title'], translator) )
+                else:
+                    print('%s Video "%s" already assigned to %s' % (date, db[0]['original_title'], translator) )
 
-        elif stActivity['type'] == 'collab-auto-unassigned' or (stActivity['type'] == 'collab-unassign' and stActivity['role'] == 'subtitler'):
-            ytID = lookupYTID(video)
-            db = getDBObjects(ytID)
-            translator = getKATranslatorName(stActivity['assignee']['username'])
+            elif stActivity['type'] == 'collab-auto-unassigned' or (stActivity['type'] == 'collab-unassign' and stActivity['role'] == 'subtitler'):
+                ytID = lookupYTID(video)
+                db = getDBObjects(ytID)
+                # if no db entry, ignore as this video has been deleted from the database
+                if (len(db)== 0):
+                    continue
 
-            if len(db) > 0 and db[0]['translation_status'] == 'Assigned' and db[0]['translator'] == translator:
-                print('%s Video "%s" unassigned from %s' % ( date, db[0]['original_title'], translator))
-                sql = "UPDATE `ka-content` SET `translation_status` = NULL, `translator` = NULL, `translation_date` = NULL WHERE `youtube_id` = '%s'" % ytID
-                doSQL(sql)
-                update = update + 1
+                translator = getKATranslatorName(stActivity['assignee']['username'])
 
-        #Change status to translated
-        elif stActivity['type'] == 'collab-state-change' and stActivity['state_change'] == 'endorse' and stActivity['role'] == 'subtitler':
-            ytID = lookupYTID(video)
-            db = getDBObjects(ytID)
-            translator = getKATranslatorName(stActivity['user']['username'])
+                if len(db) > 0 and db[0]['translation_status'] == 'Assigned' and db[0]['translator'] == translator:
+                    print('%s Video "%s" unassigned from %s' % ( date, db[0]['original_title'], translator))
+                    sql = "UPDATE `ka-content` SET `translation_status` = NULL, `translator` = NULL, `translation_date` = NULL WHERE `youtube_id` = '%s'" % ytID
+                    doSQL(sql)
+                    update = update + 1
+
+            #Change status to translated
+            elif stActivity['type'] == 'collab-state-change' and stActivity['state_change'] == 'endorse' and stActivity['role'] == 'subtitler':
+                ytID = lookupYTID(video)
+                db = getDBObjects(ytID)
+                # if no db entry, ignore as this video has been deleted from the database
+                if (len(db)== 0):
+                    continue
+
+                translator = getKATranslatorName(stActivity['user']['username'])
             
-            sql = "UPDATE `ka-content` SET `translation_status` = 'Translated', `translator` = '%s', `translation_date` = '%s' WHERE `youtube_id` = '%s'" % ( translator, date.split('T')[0], ytID)            
-            if len(db) > 0 and db[0]['translation_status'] == 'Assigned' and db[0]['translator'] == translator:
-                print('%s Video "%s" translated/endorsed by %s' % ( date, db[0]['original_title'], translator ))
-
-                update = update + 1
-                doSQL(sql)
-
-            else:
-                if ( not db[0]['translation_status'] == 'Translated' ):
+                sql = "UPDATE `ka-content` SET `translation_status` = 'Translated', `translator` = '%s', `translation_date` = '%s' WHERE `youtube_id` = '%s'" % ( translator, date.split('T')[0], ytID)            
+                if len(db) > 0 and db[0]['translation_status'] == 'Assigned' and db[0]['translator'] == translator:
                     print('%s Video "%s" translated/endorsed by %s' % ( date, db[0]['original_title'], translator ))
-                    print('inconsistent state (%s,%s), still moving to Translated' % (db[0]['translation_status'], db[0]['translator']))
+
                     update = update + 1
                     doSQL(sql)
-                else:
-                    print('%s Video "%s" already in status Translated' % (date, db[0]['original_title']))
-                    ignored = ignored + 1
 
-        #Change status to reviewed
-        elif stActivity['type'] == 'collab-state-change' and stActivity['state_change'] == 'endorse' and stActivity['role'] == 'reviewer':
-            ytID = lookupYTID(video)
-            db = getDBObjects(ytID)
-            reviewer = getKATranslatorName(stActivity['user']['username'])
+                else:
+                    if ( not db[0]['translation_status'] == 'Translated' ):
+                        print('%s Video "%s" translated/endorsed by %s' % ( date, db[0]['original_title'], translator ))
+                        print('inconsistent state (%s,%s), still moving to Translated' % (db[0]['translation_status'], db[0]['translator']))
+                        update = update + 1
+                        doSQL(sql)
+                    else:
+                        print('%s Video "%s" already in status Translated' % (date, db[0]['original_title']))
+                        ignored = ignored + 1
+
+            #Change status to reviewed
+            elif stActivity['type'] == 'collab-state-change' and stActivity['state_change'] == 'endorse' and stActivity['role'] == 'reviewer':
+                ytID = lookupYTID(video)
+                db = getDBObjects(ytID)
+                # if no db entry, ignore as this video has been deleted from the database
+                if (len(db)== 0):
+                    continue
+
+                reviewer = getKATranslatorName(stActivity['user']['username'])
             
-            #Add DB field for reviewer, review_date
-            #sql = "UPDATE `ka-content` SET `translation_status` = 'Approved', `reviewer` = '%s', `review_date` = '%s' WHERE `youtube_id` = '%s'" % ( reviewer, date.split('T')[0], ytID)
-            sql = "UPDATE `ka-content` SET `translation_status` = 'Approved' WHERE `youtube_id` = '%s'" % ( ytID )
-            if len(db) > 0 and not db[0]['translation_status'] == 'Approved':
+                #Add DB field for reviewer, review_date
+                sql = "UPDATE `ka-content` SET `translation_status` = 'Approved', `reviewer` = '%s', `review_date` = '%s' WHERE `youtube_id` = '%s'" % ( reviewer, date.split('T')[0], ytID)
+                #sql = "UPDATE `ka-content` SET `translation_status` = 'Approved' WHERE `youtube_id` = '%s'" % ( ytID )
                 print('%s Video "%s" reviewed by %s' % ( date, db[0]['original_title'], reviewer ))
                 update = update + 1
                 doSQL(sql)
-            else:
-                print('%s Video "%s" already in status Approved' % (date, db[0]['original_title']))
+
+
+            #ignore these Activity Types
+            elif stActivity['type'] == 'version-added' or stActivity['type'] == 'collab-join' or stActivity['type'] == 'collab-unassign' or stActivity['type'] == 'collab-state-change':           
                 ignored = ignored + 1
 
-        #ignore these Activity Types
-        elif stActivity['type'] == 'version-added' or stActivity['type'] == 'collab-join' or stActivity['type'] == 'collab-unassign' or stActivity['type'] == 'collab-state-change':           
-            ignored = ignored + 1
-
-        else:
-            print("%s Unknown Activity: " + stActivity['type'])
-            print(stActivity)
-            unknown = unknown + 1
+            else:
+                print("%s Unknown Activity: " + stActivity['type'])
+                print(stActivity)
+                unknown = unknown + 1
 
     print("Ignored %s activities" % ignored)
     print("Unknown %s activities" % unknown)
