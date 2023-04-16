@@ -98,16 +98,24 @@ class KAContent(object):
 
     def focusCourseCondition(self, course):
 
-        if not course in Configuration.focusCourses:
+        if not course in Configuration.focusCourses and course != 'all':
             return ''
 
-        courses = Configuration.focusCourses[course]
+        if (course == 'all'):
+            print("hello world")
+            cCourses = []
+            for course in Configuration.focusCourses:
+                cCourses.append(self.focusCourseCondition(course))
 
-        cCourses = []
-        for c in courses:
-            cCourses.append("'%s'" % c)
+            return ', '.join(cCourses)
+        else:
+            courses = Configuration.focusCourses[course]
 
-        return ', '.join(cCourses)
+            cCourses = []
+            for c in courses:
+                cCourses.append("'%s'" % c)
+
+            return ', '.join(cCourses)
 
     # Load all users with permission contributore (1 or higher)
     def getUsers(self):
@@ -151,7 +159,7 @@ class KAContent(object):
                     where.append("(translation_status = '' or translation_status = 'Assigned')")
             
             #Limit to not Translated Videos unless showAll is specified or "approval-backlog"
-            elif (not showAll) and filter != "approval" and filter != "assigned":
+            elif (not showAll) and filter != "approval" and filter != "assigned" and filter != "publish":
                 where.append("(translation_status = '' or translation_status is NULL)")
             
             #build filterCondtion for focus courses
@@ -164,6 +172,12 @@ class KAContent(object):
                 noDuplicates = True
                 where.append("(translation_status = 'Assigned')")
 
+            if (filter == "publish"):
+                noDuplicates = True
+                # Include all Published Courses
+                
+                where.append("( `ka-content`.dubbed = 'True' or `ka-content`.subbed = 'True' ) AND `ka-content`.listed_anywhere = 'False'")
+                where.append("course in (%s)" % self.focusCourseCondition("all"))
 
             if (filter == "math16"):
                 where.append("course in (%s)" % filterCondition)
@@ -180,7 +194,7 @@ class KAContent(object):
                 #where.append("backlog='1'")
                 where.append("(kind='Video' or kind='Talkthrough')")
 
-            if ( not showAll):
+            if ( not showAll and filter != "publish"):
                 where.append("dubbed='False'")
                 where.append("subbed='False'")
 
@@ -191,7 +205,7 @@ class KAContent(object):
             if (noDuplicates):
                 sql = sql + " GROUP BY id"
 
-            #print(sql)
+            print(sql)
 
             cursor.execute(sql)
             result = cursor.fetchall()
@@ -259,7 +273,7 @@ def content():
     #Create Blueprint Object
     v = KAContent()
 
-    valid_filters = [ 'math16', 'math713', 'computing', 'approval', 'assigned'] # List of valid filter parameters
+    valid_filters = [ 'math16', 'math713', 'computing', 'approval', 'assigned', 'publish' ] # List of valid filter parameters
     filter = ""
     iFilter = request.args.get('filter')
     if iFilter in valid_filters:

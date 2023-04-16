@@ -38,7 +38,6 @@ def generateCourseStatistic(course):
         elements = ""
         cursor.execute(sql)
         result = cursor.fetchone()
-        
         result['todo'] = result['total'] - result['dubbed'] - result['subbed'] - result['sub_translated']
         courseData["videos"] = result
 
