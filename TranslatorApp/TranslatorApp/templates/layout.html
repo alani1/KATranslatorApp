@@ -38,6 +38,8 @@
                     <li><a href="{{ url_for('KAStatistic.statistic') }}">Stat</a></li>
                     {% if user is defined and user['name']|length == 0 %}
                     <li><a target="_blank" href="/wp-login.php?redirect_to=TranslatorApp">Login</a></li>
+                    {% else %}
+                    <li><a target="_blank" href="/wp-login.php?action=logout&redirect_to=TranslatorApp">Logout</a></li>
                     {% endif %}
                     <li><a href="{{ url_for('about') }}">Contact</a></li>
                 </ul>
