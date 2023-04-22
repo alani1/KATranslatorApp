@@ -1,0 +1,49 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<br/>
+
+<h2>Dear {{ userName | safe }}</h2>
+Thank you for your continious effort to support Khan Academy in their mission to provide a free world-class education for anyone, anywhere. In your time since joining KA Deutsch you have:
+<ul>
+    <li>Translated {{ translatedCount }} Subtitles</li>
+    <li>Reviewed {{ reviewedCount }} Subtitles</li>
+    <li>Published {{ publishedCount }} Videos</li>
+</ul>
+Total {{ translatedCount }} Subtitles of {{ totalLength }} Hours and Minutes which have been viewed {{ totalViewcount }} times. Additionally you have reviewed {{ reviewedCount }} Subtitles.
+Thank you for your contribution!
+<br />
+<h3>Last 10 / {{ translatedCount }} translated Subtitles</h3>
+<table class="table table-striped">
+    <tr><th>Title</th><th>Length</th><th>Date</th><th>Status</th><th>Published</th><th>Type</th><th>#-Views</th></tr>
+    {% for subtitle in translatedSubtitles %}
+    {% if loop.index <= 10 %}
+    {% set seconds = subtitle.duration %}
+    <tr><td><a href="{{ subtitle.canonical_url }}">{{ subtitle.course }} | {{ subtitle.unit }} || {{ subtitle.original_title }}</a></td><td>{{ seconds|int//60 }}:{{ (seconds|int%60) }}</td><td>{{ subtitle.translation_date }}</td><td>{{ subtitle.translation_status }}</td><td>{{ subtitle.listed }}</td><td></td><td></td></tr>
+    {% endif %}
+    {% endfor %}
+
+
+    <tr><td colspan="7"><h3>Last 10 / {{ reviewedCount }} reviewed Subtitles</h3></td></tr>
+    <tr><th>Title</th><th>Length</th><th>Review Date</th><th>Reviewer Name</th><th>Published</th><th>Type</th><th>#-Views</th></tr>
+
+    {% for subtitle in reviewedSubtitles %}
+    {% if loop.index <= 10 %}
+    {% set seconds = subtitle.duration %}
+    <tr><td><a href="{{ subtitle.canonical_url }}">{{ subtitle.course }} | {{ subtitle.unit }} || {{ subtitle.original_title }}</a></td><td>{{ seconds|int//60 }}:{{ (seconds|int%60) }}</td><td>{{ subtitle.review_date }}</td><td>{{ subtitle.reviewer }}</td><td>{{ subtitle.listed }}</td><td></td><td></td></tr>
+    {% endif %}
+    {% endfor %}
+    <tr><td colspan="7"><h3>Last 10 / {{ publishedCount }} published Videos</h3></td></tr>
+    <tr><th>Title</th><th>Length</th><th>Review Date</th><th>Reviewer Name</th><th>Published</th><th>Type</th><th>#-Views</th></tr>
+    {% for subtitle in publishedSubtitles %}
+    {% set seconds = subtitle.duration %}
+    <tr><td><a href="{{ subtitle.canonical_url }}">{{ subtitle.course }} | {{ subtitle.unit }} || {{ subtitle.original_title }}</a></td><td>{{ seconds|int//60 }}:{{ (seconds|int%60) }}</td><td>{{ subtitle.translation_date }}</td><td>{{ subtitle.reviewer }}</td><td>{{ subtitle.translation_date }}</td><td>{{ subtitle.translation_status }}</td><td>4567 Views</td></tr>
+    {% endfor %}
+</table>
+
+<center>
+    WordCloud of all Contributors
+</center>
+
+{% endblock %}

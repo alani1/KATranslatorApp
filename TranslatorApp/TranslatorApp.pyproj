@@ -34,6 +34,9 @@
     <Compile Include="AmaraUpdate.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="TranslatorApp\contributions.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="TranslatorApp\statistic.py">
       <SubType>Code</SubType>
     </Compile>
@@ -84,6 +87,7 @@
     <Content Include="TranslatorApp\static\scripts\_references.js" />
     <Content Include="TranslatorApp\templates\about.html" />
     <Content Include="TranslatorApp\templates\statistic.html" />
+    <Content Include="TranslatorApp\templates\contributions.html" />
     <Content Include="TranslatorApp\templates\subtitle.html" />
     <Content Include="TranslatorApp\templates\index.html" />
     <Content Include="TranslatorApp\templates\layout.html" />
