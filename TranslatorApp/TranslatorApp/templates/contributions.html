@@ -16,7 +16,7 @@ Thank you for your contribution!
 <br />
 <h3>Last 10 / {{ translatedCount }} translated Subtitles</h3>
 <table class="table table-striped">
-    <tr><th>Title</th><th>Length</th><th>Date</th><th>Status</th><th>Published</th><th>Type</th><th>#-Views</th></tr>
+    <tr><th>Title</th><th>Length</th><th>Date</th><th>Status</th><th>Published</th><th>Status</th><th>#-Views</th></tr>
     {% for subtitle in translatedSubtitles %}
     {% if loop.index <= 10 %}
     {% set seconds = subtitle.duration %}
@@ -26,7 +26,7 @@ Thank you for your contribution!
 
 
     <tr><td colspan="7"><h3>Last 10 / {{ reviewedCount }} reviewed Subtitles</h3></td></tr>
-    <tr><th>Title</th><th>Length</th><th>Review Date</th><th>Reviewer Name</th><th>Published</th><th>Type</th><th>#-Views</th></tr>
+    <tr><th>Title</th><th>Length</th><th>Review Date</th><th>Reviewer Name</th><th>Published</th><th>Status</th><th>#-Views</th></tr>
 
     {% for subtitle in reviewedSubtitles %}
     {% if loop.index <= 10 %}
@@ -35,10 +35,15 @@ Thank you for your contribution!
     {% endif %}
     {% endfor %}
     <tr><td colspan="7"><h3>Last 10 / {{ publishedCount }} published Videos</h3></td></tr>
-    <tr><th>Title</th><th>Length</th><th>Review Date</th><th>Reviewer Name</th><th>Published</th><th>Type</th><th>#-Views</th></tr>
+    <tr><th>Title</th><th>Length</th><th>Review Date</th><th>Reviewer Name</th><th>Published</th><th>Status</th><th>#-Views</th></tr>
     {% for subtitle in publishedSubtitles %}
     {% set seconds = subtitle.duration %}
-    <tr><td><a href="{{ subtitle.canonical_url }}">{{ subtitle.course }} | {{ subtitle.unit }} || {{ subtitle.original_title }}</a></td><td>{{ seconds|int//60 }}:{{ (seconds|int%60) }}</td><td>{{ subtitle.translation_date }}</td><td>{{ subtitle.reviewer }}</td><td>{{ subtitle.translation_date }}</td><td>{{ subtitle.translation_status }}</td><td>4567 Views</td></tr>
+    <tr><td><a href="{{ subtitle.canonical_url }}">{{ subtitle.course }} | {{ subtitle.unit }} || {{ subtitle.original_title }}</a></td><td>{{ seconds|int//60 }}:{{ (seconds|int%60) }}</td><td>{{ subtitle.translation_date }}</td><td>{{ subtitle.reviewer }}</td><td>{{ subtitle.translation_date }}</td><td>{{ subtitle.translation_status }}</td>
+    <td>
+        {% if subtitle.yt_views != None %}{{ subtitle.yt_views }} Views /{% endif %}
+        {% if subtitle.yt_comments != None %}{{ subtitle.yt_comments }} Comments /{% endif %}
+        {% if subtitle.yt_likes != None %}{{ subtitle.yt_likes }} Likes{% endif %}
+    </td></tr>
     {% endfor %}
 </table>
 
