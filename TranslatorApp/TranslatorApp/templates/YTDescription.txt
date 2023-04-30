@@ -1,0 +1,20 @@
+﻿{{ title }} | {{ lesson }} | {{ unit }} | {{ course }} | {{ domain }} | Khan Academy
+
+{{ title }}: {{ description }}
+
+Übe diese Lektion jetzt auf der deutschen Khan Academy: {{ kaLink }}
+
+Schaue dir die nächste Lektion an: {{ nextLesson }}
+
+Hast du die letzte Lektion verpasst?  {{ previousLesson }}
+
+{{ lessonDescription }}
+
+Die Khan Academy bietet Übungsaufgaben, Lehrvideos und ein personalisiertes Lern-Dashboard, das es den Lernenden ermöglicht, in ihrem eigenen Tempo innerhalb und außerhalb des Klassenzimmers zu lernen. Wir beschäftigen uns mit Mathe, Naturwissenschaften, Computerprogrammierung, Geschichte, Kunstgeschichte, Wirtschaft und mehr. Unsere Mathe-Übungen leiten die Lernenden vom 1x1 bis zur Infinitesimalrechnung mit modernster, adaptiver Technologie, welche  Stärken und Lernlücken identifiziert. Außerdem haben wir uns mit Institutionen wie der NASA, dem Museum of Modern Art, der California Academy of Sciences und dem MIT zusammengeschlossen, um spezielle Inhalte anzubieten.
+
+Diese Video wurden von {{ translator }}KA Deutsch e.V. ins Deutsche übersetzt. Wir sind eine gemeinnützige Organisation und brauchen deine Unterstützung: https://www.kadeutsch.org
+
+Umsonst. Für alle. Für immer. #YouCanLearnAnything
+
+Abonniere den Kanal Khan Academy {{ course }}: {{ channelLink }} / Kanal  
+Abonniere die Khan Academy: https://www.youtube.com/KhanAcademyDeutsch

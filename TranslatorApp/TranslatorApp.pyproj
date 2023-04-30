@@ -37,6 +37,9 @@
     <Compile Include="TranslatorApp\contributions.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="TranslatorApp\DBModule.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="TranslatorApp\statistic.py">
       <SubType>Code</SubType>
     </Compile>

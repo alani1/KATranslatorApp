@@ -1,20 +1,16 @@
-import pymysql
-import urllib.request
-import TranslatorApp.Configuration as Configuration
 import csv
 
-def dbConnection():
-    return pymysql.connect(host=Configuration.dbHost,
-                           user=Configuration.dbUser,
-                           password=Configuration.dbPassword,
-                           db=Configuration.dbDatabase,
-                           charset='utf8mb4',
-                           cursorclass=pymysql.cursors.DictCursor)
+import TranslatorApp.Configuration as Configuration
+from DBModule import getDBConnection
+
+
+
+
 
 if __name__ == '__main__':
 
 
-    connection = dbConnection()
+    connection = getDBConnection()
 
     try:
         with connection.cursor() as cursor:
@@ -62,12 +58,12 @@ if __name__ == '__main__':
             # Mark rows as removed which don't exist in the file
             
             # Select all rows which are marked as deleted
-            select_removed_query = "SELECT * FROM `ka-content` WHERE deleted=True"
-            cursor.execute(select_removed_query)
-            result = cursor.fetchall()
+            #select_removed_query = "SELECT * FROM `ka-content` WHERE deleted=True"
+            #cursor.execute(select_removed_query)
+            #result = cursor.fetchall()
 
             # Loop through each row which is marked as deleted
-            for row in result:
+            # for row in result:
             # Check if the row exists in the file
 
 

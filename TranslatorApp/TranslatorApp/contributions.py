@@ -42,6 +42,7 @@ def contributions(name):
     return render_template(
         'contributions.html',
         userName=name,
+        baseURL=Configuration.baseURL,
         translatedCount=len(translated),
         translatedSubtitles=translated,
         reviewedCount=len(reviewed),

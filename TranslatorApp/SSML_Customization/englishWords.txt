@@ -1,0 +1,7 @@
+# List any English words which should be pronounced with English Accent
+# This ensures they will not be translated, and will be spoken as words in the TTS stage
+Brenda Jin
+Khan Academy
+Sarah Northway
+Yann Dauphin
+Times New Roman

@@ -1,4 +1,4 @@
-import json
+﻿import json
 from datetime import datetime
 from flask import (
     Blueprint, flash, g, redirect, render_template, make_response, request, jsonify
@@ -364,7 +364,7 @@ class Subtitles(object):
                     deTitle = self.deeplTranslate(title).json()["translations"][0]["text"]
                     deDescription = self.deeplTranslate(description).json()["translations"][0]["text"]
                     deDescription = deDescription.replace("https://www.khanacademy.org", "https://de.khanacademy.org")
-                    deDescription += "\n\nDie deutschen Untertitel fuer dieses Video wurden vom Team KA Deutsch e.V. erstellt. Wir brauchen deine Unterstuetzung. https://www.kadeutsch.org"
+                    deDescription += "\n\nDie deutschen Untertitel für dieses Video wurden vom Team KA Deutsch e.V. erstellt. Wir brauchen deine Unterstützung. https://www.kadeutsch.org"
                     
 
                     result = self.addNewSubtitle(amaraID, deSubtitle, deTitle, deDescription)

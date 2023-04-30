@@ -4,6 +4,37 @@
 
 <br/>
 
+<div class="modal fade" id="videoModal" tabindex="-1" aria-labelledby="videoModalLabel" aria-hidden="true">
+    <div class="modal-dialog" style="width:auto;" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                Video
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <center>
+                <div class="embed-responsive embed-responsive-16by9">
+                    <video id="video" class="embed-responsive-item" controls>
+                        <source id="videoSRC" src="" type="video/mp4" />
+                    </video>
+                </div>
+                </center>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+    function showVideo(vid) {
+        console.log(vid);
+        $('#videoSRC').attr('src', '{{baseURL}}'+vid);
+        $('#video').load();
+        $('#videoModal').modal('show');
+    }
+</script>
+
 <h2>Dear {{ userName | safe }}</h2>
 Thank you for your continious effort to support Khan Academy in their mission to provide a free world-class education for anyone, anywhere. In your time since joining KA Deutsch you have:
 <ul>
@@ -20,7 +51,7 @@ Thank you for your contribution!
     {% for subtitle in translatedSubtitles %}
     {% if loop.index <= 10 %}
     {% set seconds = subtitle.duration %}
-    <tr><td><a href="{{ subtitle.canonical_url }}">{{ subtitle.course }} | {{ subtitle.unit }} || {{ subtitle.original_title }}</a></td><td>{{ seconds|int//60 }}:{{ (seconds|int%60) }}</td><td>{{ subtitle.translation_date }}</td><td>{{ subtitle.translation_status }}</td><td>{{ subtitle.listed }}</td><td></td><td></td></tr>
+    <tr><td><a href="{{ subtitle.canonical_url }}" target="_blank">{{ subtitle.course }} | {{ subtitle.unit }} || {{ subtitle.original_title }}</a></td><td>{{ seconds|int//60 }}:{{ (seconds|int%60) }}</td><td>{{ subtitle.translation_date }}</td><td>{{ subtitle.translation_status }}</td><td>{{ subtitle.listed }}</td><td></td><td></td></tr>
     {% endif %}
     {% endfor %}
 
@@ -31,19 +62,39 @@ Thank you for your contribution!
     {% for subtitle in reviewedSubtitles %}
     {% if loop.index <= 10 %}
     {% set seconds = subtitle.duration %}
-    <tr><td><a href="{{ subtitle.canonical_url }}">{{ subtitle.course }} | {{ subtitle.unit }} || {{ subtitle.original_title }}</a></td><td>{{ seconds|int//60 }}:{{ (seconds|int%60) }}</td><td>{{ subtitle.review_date }}</td><td>{{ subtitle.reviewer }}</td><td>{{ subtitle.listed }}</td><td></td><td></td></tr>
+    {% set url = subtitle.canonical_url %}
+    <tr><td><a href="{{ url }}" target="_blank">{{ subtitle.course }} | {{ subtitle.unit }} || {{ subtitle.original_title }}</a></td><td>{{ seconds|int//60 }}:{{ (seconds|int%60) }}</td><td>{{ subtitle.review_date }}</td><td>{{ subtitle.reviewer }}</td><td>{{ subtitle.listed }}</td>
+    <td>{{ subtitle.translation_status }}
+            {% if subtitle.local_video != None %}
+                <button type="button" class="btn btn-sm" data-toggle="tooltip" data-placement="top" title="Edit" onClick="showVideo('{{ AIVideo }}');"><i class="fa-brands fa-youtube"></i> </button>
+            {% endif %}
+    </td><td></td></tr>
     {% endif %}
     {% endfor %}
+
     <tr><td colspan="7"><h3>Last 10 / {{ publishedCount }} published Videos</h3></td></tr>
     <tr><th>Title</th><th>Length</th><th>Review Date</th><th>Reviewer Name</th><th>Published</th><th>Status</th><th>#-Views</th></tr>
     {% for subtitle in publishedSubtitles %}
     {% set seconds = subtitle.duration %}
-    <tr><td><a href="{{ subtitle.canonical_url }}">{{ subtitle.course }} | {{ subtitle.unit }} || {{ subtitle.original_title }}</a></td><td>{{ seconds|int//60 }}:{{ (seconds|int%60) }}</td><td>{{ subtitle.translation_date }}</td><td>{{ subtitle.reviewer }}</td><td>{{ subtitle.translation_date }}</td><td>{{ subtitle.translation_status }}</td>
-    <td>
-        {% if subtitle.yt_views != None %}{{ subtitle.yt_views }} Views /{% endif %}
-        {% if subtitle.yt_comments != None %}{{ subtitle.yt_comments }} Comments /{% endif %}
-        {% if subtitle.yt_likes != None %}{{ subtitle.yt_likes }} Likes{% endif %}
-    </td></tr>
+    {% set AIVideo = subtitle.local_video %}
+
+    <tr>
+        <td><a href="{{ subtitle.canonical_url }}">{{ subtitle.course }} | {{ subtitle.unit }} || {{ subtitle.original_title }}</a></td>
+        <td>{{ seconds|int//60 }}:{{ (seconds|int%60) }}</td>
+        <td>{{ subtitle.translation_date }}</td>
+        <td>{{ subtitle.reviewer }}</td>
+        <td>{{ subtitle.translation_date }}</td>
+        <td>{{ subtitle.translation_status }} 
+            {% if subtitle.local_video != None %}
+                <button type="button" class="btn btn-sm" data-toggle="tooltip" data-placement="top" title="Edit" onClick="showVideo('{{ AIVideo }}');"><i class="fa-brands fa-youtube"></i> </button>
+            {% endif %}
+        </td>
+        <td>
+            {% if subtitle.yt_views != None %}{{ subtitle.yt_views }} Views /{% endif %}
+            {% if subtitle.yt_comments != None %}{{ subtitle.yt_comments }} Comments /{% endif %}
+            {% if subtitle.yt_likes != None %}{{ subtitle.yt_likes }} Likes{% endif %}
+        </td>
+    </tr>
     {% endfor %}
 </table>
 

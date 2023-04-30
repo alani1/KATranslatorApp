@@ -1,9 +1,10 @@
 import json
-import pymysql
 import requests
 import datetime
 import math
 import TranslatorApp.Configuration as Configuration
+from DBModule import getDBConnection
+
 
 amaraAPI = Configuration.amaraAPI
 
@@ -16,19 +17,6 @@ def lookupYTID(amaraID):
     return YTID
 
 dbConnection = None
-
-def getDBConnection():
-
-    global dbConnection
-    if dbConnection == None:
-        dbConnection = pymysql.connect(host=Configuration.dbHost,
-                    user=Configuration.dbUser,
-                    password=Configuration.dbPassword,
-                    db=Configuration.dbDatabase,
-                    charset='utf8mb4',
-                    cursorclass=pymysql.cursors.DictCursor)
-
-    return dbConnection
 
 
 def getDBObjects(YTid):

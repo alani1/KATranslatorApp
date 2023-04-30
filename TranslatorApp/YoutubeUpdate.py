@@ -3,11 +3,8 @@ import google.auth.transport.requests
 import requests
 from datetime import datetime, date
 import TranslatorApp.Configuration as Configuration
- 
+from DBModule import getDBConnection
 
-# Set your API key and video ID
-API_KEY = 'AIzaSyBwaJopT5yxa-fVs-flZuXXNxkmw1Cs7GY'
-VIDEO_ID = 'WZ-rrNO_uoo'
 
 from pytube import YouTube
 from googleapiclient.discovery import build
@@ -16,7 +13,7 @@ def getVideoData(ytID, dbConnection):
 
     # Get the number of views using the YouTube Data API
 
-    youtube = build('youtube', 'v3', developerKey=API_KEY)
+    youtube = build('youtube', 'v3', developerKey=Configuration.googleAPI)
     video_stats = youtube.videos().list(part='statistics', id=ytID).execute()
 
     if ( len(video_stats['items']) > 0 and 'statistics' in video_stats['items'][0]):
@@ -56,12 +53,7 @@ def getVideoData(ytID, dbConnection):
 def getGermanVideos():
     # Get the German videos from the database
 
-    dbConnection = pymysql.connect(host=Configuration.dbHost,
-                user=Configuration.dbUser,
-                password=Configuration.dbPassword,
-                db=Configuration.dbDatabase,
-                charset='utf8mb4',
-                cursorclass=pymysql.cursors.DictCursor)
+    dbConnection = getDBConnection()
 
     updateCount = 0
 
