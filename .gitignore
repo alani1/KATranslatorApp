@@ -364,3 +364,5 @@ FodyWeavers.xsd
 /TranslatorApp/TranslatorApp/aiDubbing.py
 /TranslatorApp/TranslatorApp/data/Psl3LWRAysQ.srt
 /TranslatorApp/de-export-recent.tsv
+/TranslatorApp/data
+/TranslatorApp/workingFolder
