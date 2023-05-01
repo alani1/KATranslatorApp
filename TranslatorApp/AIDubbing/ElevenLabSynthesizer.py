@@ -25,9 +25,9 @@ class ElevenLabSynthesizer(BaseSynthesizer):
 
         print("Synthesizing Audio with ElevnLab for %s" % filePath)
 
-        api_key = "5017388514bdf3f5b64adccc51fa6a06"
+        api_key = Configuration.elevenlabsAPI
         user = ElevenLabsUser(api_key)
-        print("Characters left: %s" % user.get_current_character_count() )
+        print("Characters left: %s" % user.get_character_limit - user.get_current_character_count() )
 
         print(subtitle['content'])
 
