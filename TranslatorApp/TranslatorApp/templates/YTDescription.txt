@@ -16,5 +16,8 @@ Diese Video wurden von {{ translator }}KA Deutsch e.V. ins Deutsche übersetzt. 
 
 Umsonst. Für alle. Für immer. #YouCanLearnAnything
 
+{% if channelLink|length %}
 Abonniere den Kanal Khan Academy {{ course }}: {{ channelLink }} / Kanal  
-Abonniere die Khan Academy: https://www.youtube.com/KhanAcademyDeutsch
+{% endif %}
+
+Abonniere die Khan Academy Deutsch: https://www.youtube.com/KhanAcademyDeutsch

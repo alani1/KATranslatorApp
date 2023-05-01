@@ -28,7 +28,6 @@
 
 <script type="text/javascript">
     function showVideo(vid) {
-        console.log(vid);
         $('#videoSRC').attr('src', '{{baseURL}}'+vid);
         $('#video').load();
         $('#videoModal').modal('show');
@@ -66,7 +65,7 @@ Thank you for your contribution!
     <tr><td><a href="{{ url }}" target="_blank">{{ subtitle.course }} | {{ subtitle.unit }} || {{ subtitle.original_title }}</a></td><td>{{ seconds|int//60 }}:{{ (seconds|int%60) }}</td><td>{{ subtitle.review_date }}</td><td>{{ subtitle.reviewer }}</td><td>{{ subtitle.listed }}</td>
     <td>{{ subtitle.translation_status }}
             {% if subtitle.local_video != None %}
-                <button type="button" class="btn btn-sm" data-toggle="tooltip" data-placement="top" title="Edit" onClick="showVideo('{{ AIVideo }}');"><i class="fa-brands fa-youtube"></i> </button>
+                <button type="button" class="btn btn-sm" data-toggle="tooltip" data-placement="top" title="Edit" onClick="showVideo('{{ subtitle.local_video }}');"><i class="fa-brands fa-youtube"></i> </button>
             {% endif %}
     </td><td></td></tr>
     {% endif %}
@@ -76,7 +75,6 @@ Thank you for your contribution!
     <tr><th>Title</th><th>Length</th><th>Review Date</th><th>Reviewer Name</th><th>Published</th><th>Status</th><th>#-Views</th></tr>
     {% for subtitle in publishedSubtitles %}
     {% set seconds = subtitle.duration %}
-    {% set AIVideo = subtitle.local_video %}
 
     <tr>
         <td><a href="{{ subtitle.canonical_url }}">{{ subtitle.course }} | {{ subtitle.unit }} || {{ subtitle.original_title }}</a></td>
@@ -86,7 +84,7 @@ Thank you for your contribution!
         <td>{{ subtitle.translation_date }}</td>
         <td>{{ subtitle.translation_status }} 
             {% if subtitle.local_video != None %}
-                <button type="button" class="btn btn-sm" data-toggle="tooltip" data-placement="top" title="Edit" onClick="showVideo('{{ AIVideo }}');"><i class="fa-brands fa-youtube"></i> </button>
+                <button type="button" class="btn btn-sm" data-toggle="tooltip" data-placement="top" title="Edit" onClick="showVideo('{{ subtitle.local_video }}');"><i class="fa-brands fa-youtube"></i> </button>
             {% endif %}
         </td>
         <td>

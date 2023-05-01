@@ -58,7 +58,9 @@ class BaseSynthesizer:
             self.dbData = cursor.fetchone()
 
         self.workingDirectory = '.' + os.sep + 'workingFolder'
-        self.dataDirectory = '.' + os.sep + 'TranslatorApp' + os.sep + 'static' + os.sep + 'data' + os.sep + self.dbData['course'] + os.sep + self.dbData['unit'] + os.sep + self.dbData['lesson']
+
+        #extract the part after ":" using split function, because ":" is not allowed in directory or filenames
+        self.dataDirectory = '.' + os.sep + 'TranslatorApp' + os.sep + 'static' + os.sep + 'data' + os.sep + self.dbData['course'].split(':')[-1] + os.sep + self.dbData['unit'].split(':')[-1] + os.sep + self.dbData['lesson'].split(':')[-1]
         #create directory if it does not exist
         if not os.path.exists(self.dataDirectory):
             os.makedirs(self.dataDirectory)
@@ -92,6 +94,8 @@ class BaseSynthesizer:
                     with open(self.subtitleFile, 'w', newline='\n') as file:
                         file.write(self.deSubtitle.text)
                         file.close()
+
+    
 
     # Identify the correct URL for Downloading the German Subtitle from Amara.org
     def getAmaraSubtitleURL(self):
@@ -152,8 +156,8 @@ class BaseSynthesizer:
         current_subtitle = dict(content='', ssml='', start=0, end=0, char_rate=0)
         current_end_time = 0
 
-        #print("Subtties debugging")
         for subtitle in subtitle_blocks:
+
             # Split the subtitle into lines and extract the start and end times
             lines = subtitle.split('\n')
             #print(lines)
@@ -165,7 +169,9 @@ class BaseSynthesizer:
             content = ''
             #join subtitles with multiple lines
             for i in range(2,len(lines)):
-                content += lines[i] + ' '
+                # Workaround
+                # We insert a space after numbers at end of a sentence. This is to avoid that AI Voice reads the number as ordinal (e.g. 30. -> 30th)
+                content += re.sub(r'(\d+)\.$', r'\1 .', lines[i]) + ' '
 
             #print(content)
             #print("duration: " + str(duration))
@@ -333,65 +339,67 @@ class BaseSynthesizer:
         template = environment.get_template("YTDescription.txt")
 
 
+        values = {}
+
+        values['title'] = self.dbData['translated_title']
+        values['kaLink'] = self.dbData['canonical_url']
+
+        domain = self.getKAData("domain", self.dbData['domain'])
+        values['domain'] = domain['translated_title']
+
+        course = self.getKAData("course", self.dbData['course'])
+        values['course'] = course['translated_title']
+        courseDescription = course['translated_description_html']
+
+        unit = self.getKAData("unit", self.dbData['unit'])
+        values['unit'] = unit['translated_title']
+        unitDescription = unit['translated_description_html']
+
+        lesson = self.getKAData("lesson", self.dbData['lesson'])
+        values['lesson'] = lesson['translated_title']
+        values['description'] = lesson['translated_description_html']
+                
+        #nextLesson
+        #previousLesson
+
         dbConnection = getDBConnection()
+        #select all rows with same lesson
+        sql = "SELECT * FROM %s.`ka-content`" % Configuration.dbDatabase + " where lesson = '%s'" % self.dbData['lesson']
+        with dbConnection.cursor() as cursor2:
+            cursor2.execute(sql)
+            contents = cursor2.fetchall()
+            i = 0
+            for content in contents:
+                if(content['id'] == self.dbData['id']):
+                    #print("found the same id and it is row %s" % i)
+                    values['previousLesson'] = contents[i-1]['canonical_url']
+                    values['nextLesson'] = contents[i+1]['canonical_url']
+                i+=1
+                
+        #translator
+        if (self.dbData['translator'] != None and len(self.dbData['translator']) > 0):
+            values['translator'] = self.dbData['translator'].capitalize() + " von "
+
+        # generate lessonDescription, takes the course description and adds the unit description
+        values['lessonDescription'] = courseDescription + unitDescription
+
+        #channelLink
+        #Check if the course exists in AIDubbing Configuration
+        if (self.dbData['course'] in AIConfiguration.channelLink):
+            values['channelLink'] =AIConfiguration.channelLink[self.dbData['course']]
+        else:
+           values['channelLink'] = ''
+
+        content = template.render(values)
+        #print(values)
+
+        # Save the generated Description to the DB
+
+        sql = "UPDATE %s.`ka-content`" % Configuration.dbDatabase + " SET yt_description = '%s' where youtube_id = '%s'" % (content, self.YTid)
         with dbConnection.cursor() as cursor:
-            sql = "SELECT * FROM %s.`ka-content`" % Configuration.dbDatabase + " where youtube_id = '%s'" % self.YTid
             cursor.execute(sql)
-            #print(sql)
-            for row in cursor.fetchall():            
-                values = {}
-
-                values['title'] = row['translated_title']
-                values['kaLink'] = row['canonical_url']
-
-                domain = self.getKAData("domain", row['domain'])
-                values['domain'] = domain['translated_title']
-
-                course = self.getKAData("course", row['course'])
-                values['course'] = course['translated_title']
-
-                unit = self.getKAData("unit", row['unit'])
-                values['unit'] = unit['translated_title']
-
-                lesson = self.getKAData("lesson", row['lesson'])
-                values['lesson'] = lesson['translated_title']
-                values['description'] = lesson['translated_description_html']
-                
-                #nextLesson
-                #previousLesson
-                #select all rows with same lesson
-                sql = "SELECT * FROM %s.`ka-content`" % Configuration.dbDatabase + " where lesson = '%s'" % row['lesson']
-                with dbConnection.cursor() as cursor2:
-                    cursor2.execute(sql)
-                    contents = cursor2.fetchall()
-                    i = 0
-                    for content in contents:
-                        if(content['id'] == row['id']):
-                            #print("found the same id and it is row %s" % i)
-                            values['previousLesson'] = contents[i-1]['canonical_url']
-                            values['nextLesson'] = contents[i+1]['canonical_url']
-                        i+=1
-                
-                #translator
-                if (row['translator'] != None and len(row['translator']) > 0):
-                    values['translator'] = row['translator'].capitalize() + " von "
-
-                # generate lessonDescription, takes the course description and adds the unit description
-                c = AIConfiguration.courseDescriptions[row['course']]
-                values['lessonDescription'] = c['description'] + c[row['unit']]
-
-                #channelLink
-                values['channelLink'] =AIConfiguration.courseDescriptions[row['course']]['channelLink']
-
-                content = template.render(values)
-                #print(values)
-
-                # Save the generated Description to the DB
-
-                sql = "UPDATE %s.`ka-content`" % Configuration.dbDatabase + " SET yt_description = '%s' where youtube_id = '%s'" % (content, self.YTid)
-                with dbConnection.cursor() as cursor:
-                    cursor.execute(sql)
-                dbConnection.commit()
+        dbConnection.commit()
+        print("Youtube Description updated in DB")
 
 
-                #print(content)
+        #print(content)

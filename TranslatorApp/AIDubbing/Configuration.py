@@ -1,17 +1,20 @@
 ﻿
+tts = "azure"
+#tts = "elevenlabs"
+
 defaultVoice = "Louisa"
 voices = {
     # Nice low pitch voice, very slow so needs 10% speedFactor
     'Louisa' : {
         'voiceName' : "de-DE-LouisaNeural",
         'voiceGender' : "FEMALE",
-        'speedFactor' : 1.2
+        'speedFactor' : 1.2 # 1.2 is most natural speed (pleasant)
     },
     # Multilingual Neural voice
     'Jenny' : {
         'voiceName' : "en-US-JennyMultilingualNeural",
         'voiceGender' : "FEMALE",
-        'speedFactor' : 1.05
+        'speedFactor' : 1.05  # 1.05 is most natural speed (pleasant)
     },
 
     'Kasper' : {
@@ -27,35 +30,73 @@ voices = {
     },
 }
 
-# Course Descriptions used for the YouTube Video Description
-# These need to be manually copied from the KA-Website for every course (channelLink & description) and every unit in that course
-courseDescriptions = {
-    "computer-programming" : {
-        'channelLink' : "https://www.youtube.com/playlist?list=PLirbHvoUlBTu-dd0lDLqxV-W7KE2Kn9Ge",
-        'description' : "Lerne, wie du Zeichnungen, Animationen und Spiele mit JavaScript & ProcessingJS programmieren kannst. Oder lerne, wie du Webseiten mit HTML & CSS erstellen kannst. Du kannst all deine Programme teilen, erforschen, was andere erstellt haben und gegenseitig voneinander lernen!",
-        'programming' : u"Hast du dich schon mal gefragt, was nötig ist, damit Zeichnungen zum Leben erwachen? Nun, wir müssen mit unserem Computer in einer speziellen Sprache sprechen. In dieser Unterrichtseinheit lernen wir, wie wir die Programmiersprache JavaScript und Processing JavaScript verwenden, um unsere eigenen Zeichnungen und Animationen zu erstellen.",
-        'html-css' : "Lerne, wie du mit HTML und CSS Webseiten erstellen kannst. HTML ist die Markup Language, mit der du den Inhalt, die Überschriften, Listen, Tabellen, und mehr auf deiner Seite beschreibst. CSS ist die Stylesheet Language, um die Seite zu gestalten und Farbe, Schriftart, Layout und vieles mehr zu definieren.",
-        'sql' : "Hast du dich schon mal gefragt, was nötig ist, damit Zeichnungen zum Leben erwachen? Nun, wir müssen mit unserem Computer in einer speziellen Sprache sprechen. In dieser Unterrichtseinheit lernen wir, wie wir die Programmiersprache JavaScript und Processing JavaScript verwenden, um unsere eigenen Zeichnungen und Animationen zu erstellen.",
-        'programming-games-visualizations' : "Wenn du die Einführung in JS hinter dir hast, lernst du hier neue Techniken, die dir helfen werden, Programme aus mehreren Szenen, 3D-Graphiken, Button-Menüs und Arcade-Spiele zu kreieren.",
-        'programming-natural-simulations' : "Wenn du die Einführung in JS hinter dir hast, lernst du in diesem Kurs, wie man JS, ProcessingJS und mathematische Konzepte kombiniert, um Natur in deinen Programmen zu simulieren. Dieser Kurs leitet sich ab aus 'The Nature of Code', einem Buch von Daniel Shiffman (natureofcode.com), unter CC BY-NC Lizenz genutzt.",
-        'html-css-js': 'Wenn du die Einführung in JS und die Einführung in HTML/CSS hinter dir hast, lernst du in diesem Tutorial mit Hilfe von HTML/CSS und der JavaScript DOM API, deine Webseite interaktiv zu machen.',
-        'html-js-jquery' : "Lerne, wie man jQuery, die weltweit beliebteste JS-Browserbibliothek, einsetzt, um Webseiten interaktiv zu machen. Erhalte einen Überblick über die jQuery Bibliothek, lerne den Erfinder kennen und benutze jQuery in einer Webseite.",
-        'meet-the-computing-professional-unit': "Was kannst du mit Informatik und Programmierkenntnissen anfangen, so bald du sie gelernt hast? Wir haben Menschen aus allen Teilen der Welt und der Industrie eingeladen, sich dir vorzustellen. Finde heraus,  wie vielfältig unser Feld sein kann!",
+# Maps Khan Academy Courses to Youtube Playlists on Khan Acadey Deutsch Site
+channelLink = {
 
-    },
-    "computer-science" : {
-        #For now we use the same course also for Computer Science / Informatik
-        'channelLink' : "https://www.youtube.com/playlist?list=PLirbHvoUlBTu-dd0lDLqxV-W7KE2Kn9Ge",
-        'description' : "Lerne ausgewählte Themen der Informatik wie z.B. Algorithmen (wie wir häufige Probleme in der Informatik lösen und die Effizienz unserer Lösungen messen können), Kryptografie (wie wir geheime Informationen schützen) und Informationstheorie (wie wir Informationen verschlüsseln und komprimieren).",
-        #add computer science units
-        'algorithms' : "Wir haben haben uns mit den Professoren Tom Cormen und Devin Balkcom vom Dartmouth College zusammengetan um eine Einführung in die Algorithmen-Theorie inklusive Suchalgorithmen, Sortierung, Rekursion und Graphentheorie zu lehren. Lerne durch eine Kombination aus Artikeln, grafischen Darstellungen,  Übungsaufgaben und Programmierchallenges.",
-        'cryptography' : "Wir haben haben uns mit den Professoren Tom Cormen und Devin Balkcom vom Dartmouth College zusammengetan um eine Einführung in die Algorithmen-Theorie inklusive Suchalgorithmen, Sortierung, Rekursion und Graphentheorie zu lehren. Lerne durch eine Kombination aus Artikeln, grafischen Darstellungen,  Übungsaufgaben und Programmierchallenges.",
-        'informationtheory' : "Wir haben schon immer miteinander kommuniziert. Obwohl wir uns von Signalfeuern zum Alphabet und zur Elektrizität entwickelt haben, viele Probleme bleiben gleich. Erkunde die Geschichte der Kommunikation vom Rauchzeichen bis zum Informationszeitalter"
+    "computer-programming" : "https://youtube.com/playlist?list=PLirbHvoUlBTuXp1DRCqINpCwAIyoDgZlp",
+    
+    "computer-science" :     "https://youtube.com/playlist?list=PLirbHvoUlBTu-dd0lDLqxV-W7KE2Kn9Ge",
 
-    },
-    "early-math" : {
-        'channelLink': "https://www.youtube.com/playlist?list=PLirbHvoUlBTtvQF1g0pCAelbj1z-YdT5a",
-        'description': "Mathe beginnt mit dem Zählen. Es ist die wichtigste Fähigkeit, die wir in unseren jungen Jahren erlernen und wird zum Fundament für alle anderen mathematischen Konzepte. Sobald wir zählen können, können wir addieren, subtrahieren, und die Welt um uns herum vermessen. Kurz danach, lernen wir über Stellenwerte, Graphen, Zeit, Geld und Formen."
-    }
+    "early-math" :           "https://www.youtube.com/playlist?list=PLirbHvoUlBTtvQF1g0pCAelbj1z-YdT5a",
+
+    "cc-kindergarten-math" : "https://www.youtube.com/playlist?list=PLirbHvoUlBTtoZsuEvOSEdU45_crqojot",   #in German called Mathematik der Vorschule
+
+    "cc-1st-grade-math" :    "https://www.youtube.com/playlist?list=PLirbHvoUlBTv8KXu0o3i0I4Iq3hSuc4KX",   #wrong
+
+    'cc-2nd-grade-math' :    "https://www.youtube.com/playlist?list=PLirbHvoUlBTtA3WcN6a07PGGx_dQLgMod",
+
+    'cc-third-grade-math' :  "https://www.youtube.com/playlist?list=PLirbHvoUlBTvJRODs49zmV5sgutjuULOW",
+
+    'cc-fourth-grade-math' : "https://www.youtube.com/playlist?list=PLirbHvoUlBTsv91OXsB2vKYqP3_K0HFT-",
+
+    'cc-fifth-grade-math' :  "https://www.youtube.com/playlist?list=PLirbHvoUlBTvfbG2vT1SCkU3bASqBKO7A",
+
+    'cc-sixth-grade-math' :  "",
+    
+
+    #'basic-geo' : {
+    #},
+
+    'geometry' : "https://www.youtube.com/playlist?list=PLirbHvoUlBTthIpU3GWJQS_B-GJxev1j6",
+
+    'cc-seventh-grade-math' : "https://www.youtube.com/playlist?list=PLirbHvoUlBTtE1m_sFJa2UeF81YrvwtHt",
+
+
+    'cc-eighth-grade-math' :  "",
+
+    'arithmetic' :  "https://youtube.com/playlist?list=PL03E05147AF31CBD7",
+    
+
+    'pre-algebra' : "https://www.youtube.com/playlist?list=PLF5752146A89A49EA",
+
+
+    #'algebra-basics' : {
+    #},
+
+    'algebra' : "https://www.youtube.com/playlist?list=PLirbHvoUlBTs1uOBDSCJKaJPtMRVi1JQV",
+
+    #'algebra2' : {
+    #},
+
+    #'precalculus' : {
+    #},
+
+    #'differential-calculus' : {
+    #},
+
+    #'integral-calculus' : {
+    #},
+
+    #'multivariable-calculus' : {
+    #},
+
+    #'linear-algebra' : {
+    #},
+
+    'differential-equations' : "https://youtube.com/playlist?list=PL69002EF42F409C59",
+
+    'trigonometry' : "https://youtube.com/playlist?list=PLEE1721AD37793565",
+   
+    'statistic' : 'https://youtube.com/playlist?list=PLirbHvoUlBTvKIko_-2mL-hwXshr_os1t'
 
 }

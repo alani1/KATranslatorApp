@@ -4,6 +4,8 @@ import re
 import argparse
 from DBModule import getDBConnection
 import TranslatorApp.Configuration as Configuration
+import AIDubbing.Configuration as AIConfiguration
+
 
 from AIDubbing.AzureSynthesizer import AzureSynthesizer
 
@@ -52,21 +54,26 @@ def processVideo(YTid):
     else:
         kind="Video"
 
-    synth = AzureSynthesizer(YTid, kind, args.voice)
+    try:
+        synth = AzureSynthesizer(YTid, kind, args.voice)
 
-    #load Subtitles and generate SSML
-    synth.readSubtitles()
+        #load Subtitles and generate SSML
+        synth.readSubtitles()
 
-    #if not DownloadOnly
-    if (not args.download):
-        #Synthesize Audio and Merge to one MP3
-        synth.synthesizeAudio()
+        #if not DownloadOnly
+        if (not args.download):
+            #Synthesize Audio and Merge to one MP3
+            synth.synthesizeAudio()
 
-        if (not args.audioOnly):
-            synth.splitVideo()
+            if (not args.audioOnly):
+                synth.splitVideo()
 
-    #Generate Youtube Title & Description for Copy Pasting
-    synth.generateYoutubeData()
+        #Generate Youtube Title & Description for Copy Pasting
+        synth.generateYoutubeData()
+
+    except ValueError as e:
+        print(repr(e))
+        exit()
 
 if __name__ == '__main__':
     print("KA-Deutsch AI-Dubbing")
@@ -79,12 +86,13 @@ if __name__ == '__main__':
     if len(args.videos) == 0:
         print("No Videos specified, generating last 10 translated / approved videos")
         with dbConnection.cursor() as cursor:
-            sql = "SELECT * FROM %s.`ka-content`" % Configuration.dbDatabase + " WHERE (kind='Video' or kind='Talkthrough') AND translation_status='approved' GROUP BY id ORDER BY translation_date DESC LIMIT 10"
+            sql = "SELECT * FROM %s.`ka-content`" % Configuration.dbDatabase + " WHERE (kind='Video' or kind='Talkthrough') AND translation_status='Approved' AND (local_video IS NULL OR local_video = '') GROUP BY id ORDER BY translation_date DESC LIMIT 5"
             cursor.execute(sql)
             result = cursor.fetchall()
             for row in result:
                 print( "%s: %s with ytID %s" % (row['kind'], row['original_title'], row['youtube_id']))
-                #processVideo( row['youtube_id'] )
+                processVideo( row['youtube_id'] )
+        exit()
 
     else:
         for YTid in args.videos:
@@ -104,4 +112,6 @@ if __name__ == '__main__':
                     print("Now we should process them download/syntesize/mergeVideo")
             else:
                 processVideo(YTid)
+
+        exit()
 

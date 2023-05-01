@@ -15,7 +15,7 @@
         } else {
             url = '{{ baseURL }}/content/data?filter=' + filter;
         }
-        
+
         if (showAll) {
             url = url + '&showAll=1'
         }
@@ -62,6 +62,33 @@
 <hr />
 <table id="table" class="display" width="100%"></table>
 
+<div class="modal fade" id="videoModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" style="width:auto;" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">AI Dubbed Video</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <center>
+                    <div class="embed-responsive embed-responsive-16by9">
+                        <video id="videoPlayer" class="embed-responsive-item" controls>
+                            <source id="videoSRC" src="" type="video/mp4" />
+                        </video>
+                    </div>
+                </center>
+                <b>Template for Youtube Description (copy/paste to YT):</b><br />
+                <div id="ytDescription">Lorem Ipsum Dolores</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% if user.isAdmin() %}
 <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
@@ -74,14 +101,16 @@
                 <h4 class="modal-title" id="modalTitelLabel">TITLE</h4>
             </div>
             <div class="modal-body">
+
+                <br />
                 <input type="hidden" id="id" name="id" />
                 <div class="form-group">
                     <label for="translator">Translator</label>
                     <input type="text" class="form-control" id="translator" list="translatorList" name="translator" placeholder="Enter Translator's name">
                     <datalist id="translatorList">
                         {%for user in users %}
-                            <option value="{{ user['user_nicename'] }}">
-                        {% endfor %}
+                        <option value="{{ user['user_nicename'] }}">
+                            {% endfor %}
                     </datalist>
                 </div>
                 <div class="form-group">
@@ -125,6 +154,7 @@
 {% endif %}
 
 <script type="text/javascript">
+    var ytDescription = [];
     myGrid=new gridjs.Grid({
 
 
@@ -210,21 +240,35 @@
             },
             { id: "translation_status", field: "translation_status", name: "Status" },
             { id: "listed", field: "listed", name: "Published" },
-            { id: "translation_comment", field: "translation_comment", name: "Comment", hidden:true },
+            { id: "translation_comment", field: "translation_comment", name: "Comment", hidden: true },
+            { id: "yt_description", field: "yt_description", hidden: true },
+            { id: "local_video", field: "local_video", hidden: true },
+
             {
                 id: "Actions", name: "Actions",
+                'attributes': (cell, row, column) => {
+                    if (row) {
+                        return {
+                            'data-ytDescription': row[16],
+                        }
+                    }
+                },
                 formatter: (cell, row) => {
                     //Change link if Content is not published
                     if (row.cells[14].data == 'False') {
-                        row.cells[1].data = row.cells[1].data.replace('https://de.', 'https://www.');                        
+                        row.cells[1].data = row.cells[1].data.replace('https://de.', 'https://www.');
+                    }
+                    if (row.cells[16].data != null ) {
+                        ytDescription[row.cells[0].data] = row.cells[16].data.replace(/\n/g, "<br />");
                     }
 
                     // Only show action buttons if the user is logged in on KADE
                     var buttons =
-                        `<a target="_blank" href="${row.cells[1].data}"><button class="btn btn-primary"data-toggle="tooltip" data-placement="top" title="Open on Khan Academy"><i class="fa-brands fa-leanpub"></i></button></a>&nbsp;` +
-                        `<a target="_blank" href="{{baseURL}}/subtitles/${row.cells[2].data}"><button class="btn btn-primary" data-toggle="tooltip" data-placement="top" title="Subtitle on Amara"><i class="fa-solid fa-closed-captioning"></i></button></a>&nbsp`;
+                        `<a target="_blank" href="${row.cells[1].data}"><button class="btn btn-sm"data-toggle="tooltip" data-placement="top" title="Open on Khan Academy"><i class="fa-brands fa-leanpub"></i></button></a>&nbsp;` +
+                        `<a target="_blank" href="{{baseURL}}/subtitles/${row.cells[2].data}"><button class="btn btn-sm" data-toggle="tooltip" data-placement="top" title="Subtitle on Amara"><i class="fa-solid fa-closed-captioning"></i></button></a>&nbsp`;
                         {% if user.isAdmin() %}
-                    buttons += `<button type="button" class="btn btn-primary" data-toggle="tooltip" data-placement="top" title="Edit" onclick="
+                    buttons += `<button type="button" class="btn btn-sm" data-toggle="tooltip" data-placement="top" title="Edit" onclick="
+
                             $('#modalTitelLabel').text('`+ row.cells[7].data.replace(/"/g, '').replace(/\'/g, '') + `');
                             $('#id').val('${row.cells[0].data}');
                             $('#translator').val('${row.cells[11].data}');
@@ -236,12 +280,12 @@
                                 $('#translationDate').val(new Date('${row.cells[12].data}').toISOString().slice(0, 10));
                             }
                             $('#translationStatus').val('${row.cells[13].data}');
-                            
+
                             //Needs some debugging
                             if('${row.cells[15].data}' == '') {
                                 console.log('DEBUG: comment is empty');
                             }
-                            
+
                             $('#translationComment').text('${row.cells[15].data}');
 
                             if ( '${row.cells[9].data}' == 'True') {
@@ -254,6 +298,18 @@
 
                             $('#editModal').modal('show');"><i class="fa-solid fa-pen-to-square"></i></button>&nbsp`;
                         {% endif %}
+
+                    // Only show the button if there is a local video
+
+                    if (row.cells[17].data != null) {
+                        console.log(row.cells[17].data);
+                        buttons += `<button type="button" class="btn btn-sm" data-toggle="tooltip" data-placement="top" title="AI Video" onClick="
+                                $('#ytDescription')[0].innerHTML = ytDescription['${row.cells[0].data}'];
+                                $('#videoSRC').attr('src', '{{baseURL}}' + '${row.cells[17].data}');
+                                $('#videoPlayer').load();
+                            $('#videoModal').modal('show');"><i class="fa-brands fa-youtube"></i> </button>`;
+
+                    }
 
                     return gridjs.html(buttons);
                     // Link to Translation Portal 1stID is the Domain, second ID is the Course
