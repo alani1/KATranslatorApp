@@ -208,7 +208,7 @@ class AzureSynthesizer(BaseSynthesizer):
     # Synthesize a Single Subtilte section using Azure TTS
     def synthesizeSingleSubtitle(self, subtitle, filePath):
 
-        print("Synthesizing Audio for %s" % filePath)
+        print("Synthesizing Audio with Azure for %s" % filePath)
 
         speech_config = speechsdk.SpeechConfig(subscription=self.azure_speech_key, region=self.azure_speech_region)
         # For Azure voices, see: https://learn.microsoft.com/en-us/azure/cognitive-services/speech-service/language-support?tabs=stt-tts
@@ -219,8 +219,8 @@ class AzureSynthesizer(BaseSynthesizer):
 
         #GenerateSSML
         subtitle['ssml'] = self.generateSSML(subtitle)
-        print("\nStart: %s, End: %s, Rate: %s char/s" % (subtitle['start'], subtitle['end'], subtitle['char_rate']))
-        print("SUBTITLE:\n" + subtitle['content'])
+        #print("\nStart: %s, End: %s, Rate: %s char/s" % (subtitle['start'], subtitle['end'], subtitle['char_rate']))
+        #print("SUBTITLE:\n" + subtitle['content'])
         print("SSML:\n" + subtitle['ssml'])
 
         #result = synthesizer.speak_text_async(text).get()

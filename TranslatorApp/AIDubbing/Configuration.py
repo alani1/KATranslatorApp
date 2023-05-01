@@ -1,6 +1,6 @@
 ﻿
-tts = "azure"
-#tts = "elevenlabs"
+#tts = "azure"
+tts = "elevenlabs"
 
 defaultVoice = "Louisa"
 voices = {

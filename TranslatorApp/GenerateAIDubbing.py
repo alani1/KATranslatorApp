@@ -8,6 +8,7 @@ import AIDubbing.Configuration as AIConfiguration
 
 
 from AIDubbing.AzureSynthesizer import AzureSynthesizer
+from AIDubbing.ElevenLabSynthesizer import ElevenLabSynthesizer
 
 def init_argparse() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -55,7 +56,11 @@ def processVideo(YTid):
         kind="Video"
 
     try:
-        synth = AzureSynthesizer(YTid, kind, args.voice)
+
+        if ( AIConfiguration.tts == "elevenlabs"):
+            synth = ElevenLabSynthesizer(YTid, kind, args.voice)
+        else:
+            synth = AzureSynthesizer(YTid, kind, args.voice)
 
         #load Subtitles and generate SSML
         synth.readSubtitles()
