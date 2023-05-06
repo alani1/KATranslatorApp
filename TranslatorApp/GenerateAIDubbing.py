@@ -91,7 +91,7 @@ if __name__ == '__main__':
     if len(args.videos) == 0:
         print("No Videos specified, generating last 10 translated / approved videos")
         with dbConnection.cursor() as cursor:
-            sql = "SELECT * FROM %s.`ka-content`" % Configuration.dbDatabase + " WHERE (kind='Video' or kind='Talkthrough') AND translation_status='Approved' AND (local_video IS NULL OR local_video = '') GROUP BY id ORDER BY translation_date DESC LIMIT 5"
+            sql = "SELECT * FROM %s.`ka-content`" % Configuration.dbDatabase + " WHERE (kind='Video' or kind='Talkthrough') AND translation_status = 'Approved' AND (local_video IS NULL OR local_video = '') GROUP BY id ORDER BY translation_date DESC LIMIT 3"
             cursor.execute(sql)
             result = cursor.fetchall()
             for row in result:

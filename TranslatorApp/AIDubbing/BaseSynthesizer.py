@@ -13,6 +13,7 @@ from moviepy.video.io.VideoFileClip import VideoFileClip
 from moviepy.video.compositing.concatenate import concatenate_videoclips
 from moviepy.audio.io.AudioFileClip import AudioFileClip
 from moviepy.editor import vfx, concatenate_audioclips
+import librosa
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -218,6 +219,8 @@ class BaseSynthesizer:
             # if no, then the audio file needs to be synthesized
 
             # Only synthesize if the audio file doesn't exist, avoid unnecessary calls to Speech Services
+            print(os.path.getmtime(self.subtitleFile))
+            print(os.path.getmtime(filePath))
             if not os.path.exists(filePath) or os.path.getmtime(self.subtitleFile) > os.path.getmtime(filePath):
 
                 # Prepare output location. If folder doesn't exist, create it
@@ -246,6 +249,16 @@ class BaseSynthesizer:
             outputFileData = os.path.join(self.dataDirectory, f'{self.name}-DE.mp3')
             output_clip.write_audiofile(outputFileData)
 
+            # Scale the audio to length of original video
+            # This is necessary because the german audio is longer than the video
+            deDuration = output_clip.duration
+            origDuration = VideoFileClip(self.videoFile).duration
+            ratio = deDuration / origDuration
+
+            new_clip = output_clip.fx( vfx.multiply_speed,final_duration=origDuration)
+            outputFileData = os.path.join(self.dataDirectory, f'{self.name}-DE-CorrectLength.mp3')
+            new_clip.write_audiofile(outputFileData)
+
 
     # Split and Assemble the Video with synthesized Audio
     def splitVideo(self):
@@ -258,6 +271,7 @@ class BaseSynthesizer:
         clips = []
 
         i = 1
+        # For every subtitle chunk, create a video clip and concatenate them
         for s in self.merged_subtitles:
             start = s["start"]
             end = s["end"]
@@ -287,7 +301,7 @@ class BaseSynthesizer:
 
             i += 1
 
-        # concatenating all the clips
+        # concatenating all the clips / chunks
         print("\nMerging %s Clips" % len(clips))
         clipArray = []
         for i in clips:
