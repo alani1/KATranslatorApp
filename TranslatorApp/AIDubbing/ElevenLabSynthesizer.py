@@ -27,7 +27,7 @@ class ElevenLabSynthesizer(BaseSynthesizer):
 
         api_key = Configuration.elevenlabsAPI
         user = ElevenLabsUser(api_key)
-        print("Characters left: %s" % user.get_character_limit - user.get_current_character_count() )
+        print("Characters left: %s" % user.get_character_limit() - user.get_current_character_count() )
 
         print(subtitle['content'])
 
