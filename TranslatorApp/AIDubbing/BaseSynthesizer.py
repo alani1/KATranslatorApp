@@ -13,6 +13,7 @@ from moviepy.video.io.VideoFileClip import VideoFileClip
 from moviepy.video.compositing.concatenate import concatenate_videoclips
 from moviepy.audio.io.AudioFileClip import AudioFileClip
 from moviepy.editor import vfx, concatenate_audioclips
+import librosa
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -246,6 +247,7 @@ class BaseSynthesizer:
         # For Talktroughs write the outputfile also to the data directory
         if self.dbData['kind'] == 'Talkthrough':
             outputFileData = os.path.join(self.dataDirectory, f'{self.name}-DE.mp3')
+            outputFileDataLength = os.path.join(self.dataDirectory, f'{self.name}-DE-CorrectLength.mp3')
             output_clip.write_audiofile(outputFileData)
 
             # Scale the audio to length of original video
@@ -254,9 +256,17 @@ class BaseSynthesizer:
             origDuration = VideoFileClip(self.videoFile).duration
             ratio = deDuration / origDuration
 
-            new_clip = output_clip.fx( vfx.multiply_speed,final_duration=origDuration)
-            outputFileData = os.path.join(self.dataDirectory, f'{self.name}-DE-CorrectLength.mp3')
-            new_clip.write_audiofile(outputFileData)
+            song, fs = librosa.load(outputFileData)
+            song = librosa.effects.time_stretch(song, rate=ratio)
+
+            import soundfile as sf
+            sf.write(outputFileDataLength, song, fs)
+
+            #librosa.output.write_wav(outputFileDataLength, song, fs)
+
+            #new_clip = output_clip.fx( vfx.multiply_speed,final_duration=origDuration)
+            
+            #new_clip.write_audiofile(outputFileDataLength)
 
 
     # Split and Assemble the Video with synthesized Audio
