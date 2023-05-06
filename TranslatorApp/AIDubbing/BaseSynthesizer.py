@@ -13,7 +13,6 @@ from moviepy.video.io.VideoFileClip import VideoFileClip
 from moviepy.video.compositing.concatenate import concatenate_videoclips
 from moviepy.audio.io.AudioFileClip import AudioFileClip
 from moviepy.editor import vfx, concatenate_audioclips
-import librosa
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -219,8 +218,6 @@ class BaseSynthesizer:
             # if no, then the audio file needs to be synthesized
 
             # Only synthesize if the audio file doesn't exist, avoid unnecessary calls to Speech Services
-            print(os.path.getmtime(self.subtitleFile))
-            print(os.path.getmtime(filePath))
             if not os.path.exists(filePath) or os.path.getmtime(self.subtitleFile) > os.path.getmtime(filePath):
 
                 # Prepare output location. If folder doesn't exist, create it
@@ -255,17 +252,7 @@ class BaseSynthesizer:
             deDuration = output_clip.duration
             origDuration = VideoFileClip(self.videoFile).duration
             ratio = deDuration / origDuration
-
-            song, fs = librosa.load(outputFileData)
-            song = librosa.effects.time_stretch(song, rate=ratio)
-
-            import soundfile as sf
-            sf.write(outputFileDataLength, song, fs)
-
-            #librosa.output.write_wav(outputFileDataLength, song, fs)
-
             #new_clip = output_clip.fx( vfx.multiply_speed,final_duration=origDuration)
-            
             #new_clip.write_audiofile(outputFileDataLength)
 
 
