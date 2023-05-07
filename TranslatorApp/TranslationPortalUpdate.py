@@ -14,7 +14,7 @@ if __name__ == '__main__':
     connection = getDBConnection()
     updateCnt = 0
 
-
+    
     try:
         with connection.cursor() as cursor:
 
@@ -29,9 +29,10 @@ if __name__ == '__main__':
             # Read the TSV file
             with open('de-export-recent.tsv', newline='', encoding='utf-8') as tsvfile:
                 reader = csv.DictReader(tsvfile, delimiter='\t')
-
+                i=0
                 # Loop through each row in the TSV file
                 for row in reader:
+
                     # Check if the row already exists in the database
                     select_query = "SELECT * FROM `ka-content` WHERE id='%s' AND lesson='%s'" % (row['id'], row['lesson'])
                     cursor.execute(select_query)
@@ -57,6 +58,10 @@ if __name__ == '__main__':
 
                         insert_query = "INSERT INTO `ka-content` (" + ", ".join(row.keys()) + ") VALUES (" + ", ".join(["%s"] * len(row.keys())) + ")"
                         cursor.execute(insert_query, list(row.values()))
+
+                    i=i+1
+                    if i%1000 == 0:
+                        print("Processed %d rows" % i)
 
             # Mark rows as removed which don't exist in the file
             

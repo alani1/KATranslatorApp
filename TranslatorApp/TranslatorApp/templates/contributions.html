@@ -41,7 +41,7 @@ Herzlichen Dank für deinen wertvollen Einsatz und die Unterstützung der Khan A
     <li>{{ reviewedCount }} deiner Untertitel sind approved </li>
     <li>{{ publishedCount }} deiner Videos und Untertitel sind auf Khan Academy publiziert</li>
 </ul>
-Die  <b>{{ publishedCount }}</b> publizierten Videos haben eine Länge von <b>{{ totalLength|int//3600 }} Stunden und {{ (totalLength|int//60) }} Minuten</b> und sind insgesamt {{ totalViewCount }} mal angeschaut worden. YT views können nur für Videos (inkl. AI Dubbing)
+Die  <b>{{ publishedCount }}</b> publizierten Videos haben eine Länge von <b>{{ totalLength|int//3600 }} Stunden und {{ (totalLength|int%3600) }} Minuten</b> und sind insgesamt {{ totalViewCount }} mal angeschaut worden. YT views können nur für Videos (inkl. AI Dubbing)
 und nicht für Untertitel resp. Talk-troughts ermittelt werden.
 <p />
 <p />
