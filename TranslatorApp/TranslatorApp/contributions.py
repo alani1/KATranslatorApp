@@ -24,20 +24,26 @@ def contributions(name):
     cursor = dbCon.cursor()
 
 
-    sql = "SELECT * FROM `ka-content` WHERE translator='%s' AND translation_status IN ('Translated') ORDER BY translation_date desc" % name
+    sql = "SELECT * FROM `ka-content` WHERE translator='%s' AND translation_status IN ('Translated') GROUP BY id ORDER BY translation_date desc" % name
  
     cursor.execute(sql)
     translated = cursor.fetchall()
 
-    sql = "SELECT * FROM `ka-content` WHERE translator='%s' AND translation_status IN ('Approved') ORDER BY translation_date desc" % name
+    sql = "SELECT * FROM `ka-content` WHERE translator='%s' AND translation_status IN ('Approved') GROUP BY id ORDER BY translation_date desc" % name
     cursor.execute(sql)
     reviewed = cursor.fetchall()
 
-    sql = "SELECT * FROM `ka-content` WHERE translator='%s' AND translation_status IN ('Native Dubbed', 'AI Dubbed', 'Approved') AND listed='True' ORDER BY translation_date desc" % name
-    print(sql)
+    sql = "SELECT * FROM `ka-content` WHERE translator='%s' AND translation_status IN ('Native Dubbed', 'AI Dubbed', 'Approved') AND listed='True' GROUP BY id ORDER BY translation_date desc" % name
+    
     cursor.execute(sql)
     published = cursor.fetchall()
 
+    totalLenght = 0
+    totalViewCount = 0
+    for v in published:
+        totalLenght = totalLenght + int(v['duration'])
+        if v['yt_views'] != None:
+            totalViewCount = totalViewCount + int(v['yt_views'])
 
     return render_template(
         'contributions.html',
@@ -48,7 +54,9 @@ def contributions(name):
         reviewedCount=len(reviewed),
         reviewedSubtitles=reviewed,
         publishedCount=len(published),
-        publishedSubtitles=published
+        publishedSubtitles=published,
+        totalLength=totalLenght,
+        totalViewCount=totalViewCount
         )
 
 bp = Blueprint('Contribution', __name__, url_prefix='/contribution')

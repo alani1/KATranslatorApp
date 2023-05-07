@@ -1,8 +1,8 @@
-{% extends "layout.html" %}
+﻿{% extends "layout.html" %}
 
 {% block content %}
 
-<br/>
+<br />
 
 <div class="modal fade" id="videoModal" tabindex="-1" aria-labelledby="videoModalLabel" aria-hidden="true">
     <div class="modal-dialog" style="width:auto;" role="document">
@@ -15,11 +15,11 @@
             </div>
             <div class="modal-body">
                 <center>
-                <div class="embed-responsive embed-responsive-16by9">
-                    <video id="video" class="embed-responsive-item" controls>
-                        <source id="videoSRC" src="" type="video/mp4" />
-                    </video>
-                </div>
+                    <div class="embed-responsive embed-responsive-16by9">
+                        <video id="video" class="embed-responsive-item" controls>
+                            <source id="videoSRC" src="" type="video/mp4" />
+                        </video>
+                    </div>
                 </center>
             </div>
         </div>
@@ -34,19 +34,24 @@
     }
 </script>
 
-<h2>Dear {{ userName | safe }}</h2>
-Thank you for your continious effort to support Khan Academy in their mission to provide a free world-class education for anyone, anywhere. In your time since joining KA Deutsch you have:
+<h2>Liebe/r {{ userName | safe }}</h2>
+Herzlichen Dank für deinen wertvollen Einsatz und die Unterstützung der Khan Academy Im Bestreben erstklassige Bildung für jeden und überall verfügbar zu machen. Hier findest du eine Aufstellung deiner bisherigen Beiträge.
 <ul>
-    <li>Translated {{ translatedCount }} Subtitles</li>
-    <li>Reviewed {{ reviewedCount }} Subtitles</li>
-    <li>Published {{ publishedCount }} Videos</li>
+    <li>{{ translatedCount }} Untertitel übersetzt (aber noch nicht approved)</li>
+    <li>{{ reviewedCount }} deiner Untertitel sind approved </li>
+    <li>{{ publishedCount }} deiner Videos und Untertitel sind auf Khan Academy publiziert</li>
 </ul>
-Total {{ translatedCount }} Subtitles of {{ totalLength }} Hours and Minutes which have been viewed {{ totalViewcount }} times. Additionally you have reviewed {{ reviewedCount }} Subtitles.
-Thank you for your contribution!
+Die  <b>{{ publishedCount }}</b> publizierten Videos haben eine Länge von <b>{{ totalLength|int//3600 }} Stunden und {{ (totalLength|int//60) }} Minuten</b> und sind insgesamt {{ totalViewCount }} mal angeschaut worden. YT views können nur für Videos (inkl. AI Dubbing)
+und nicht für Untertitel resp. Talk-troughts ermittelt werden.
+<p />
+<p />
+Vielen Dank für deine Mitarbeit!
+<p />
+Team KA Deutsch e.V.
 <br />
-<h3>Last 10 / {{ translatedCount }} translated Subtitles</h3>
+<h3>Letzte 10 von {{ translatedCount }} übersetzten Untertitel (warten auf approval)</h3>
 <table class="table table-striped">
-    <tr><th>Title</th><th>Length</th><th>Date</th><th>Status</th><th>Published</th><th>Status</th><th>#-Views</th></tr>
+    <tr><th>Titel</th><th>Länge</th><th>Datum</th><th>Status</th><th>Publiziert</th><th>Status</th><th>#-Views</th></tr>
     {% for subtitle in translatedSubtitles %}
     {% if loop.index <= 10 %}
     {% set seconds = subtitle.duration %}
@@ -55,24 +60,32 @@ Thank you for your contribution!
     {% endfor %}
 
 
-    <tr><td colspan="7"><h3>Last 10 / {{ reviewedCount }} reviewed Subtitles</h3></td></tr>
-    <tr><th>Title</th><th>Length</th><th>Review Date</th><th>Reviewer Name</th><th>Published</th><th>Status</th><th>#-Views</th></tr>
+    <tr><td colspan="7"><h3>Letzte 10 von {{ reviewedCount }} approved Untertitel (warten auf Publizierung)</h3></td></tr>
+    <tr><th>Titel</th><th>Länge</th><th>Review Datum</th><th>Reviewer Name</th><th>Publiziert</th><th>Status</th><th>#-Views</th></tr>
 
     {% for subtitle in reviewedSubtitles %}
     {% if loop.index <= 10 %}
     {% set seconds = subtitle.duration %}
     {% set url = subtitle.canonical_url %}
-    <tr><td><a href="{{ url }}" target="_blank">{{ subtitle.course }} | {{ subtitle.unit }} || {{ subtitle.original_title }}</a></td><td>{{ seconds|int//60 }}:{{ (seconds|int%60) }}</td><td>{{ subtitle.review_date }}</td><td>{{ subtitle.reviewer }}</td><td>{{ subtitle.listed }}</td>
-    <td>{{ subtitle.translation_status }}
+    <tr>
+        <td><a href="{{ url }}" target="_blank">{{ subtitle.course }} | {{ subtitle.unit }} || {{ subtitle.original_title }}</a></td>
+        <td>{{ seconds|int//60 }}:{{ (seconds|int%60) }}</td>
+        <td>{{ subtitle.review_date }}</td>
+        <td>{{ subtitle.reviewer }}</td>
+        <td>{{ subtitle.listed }}</td>
+        <td>
+            {{ subtitle.translation_status }}
             {% if subtitle.local_video != None %}
-                <button type="button" class="btn btn-sm" data-toggle="tooltip" data-placement="top" title="Edit" onClick="showVideo('{{ subtitle.local_video }}');"><i class="fa-brands fa-youtube"></i> </button>
+            <button type="button" class="btn btn-sm" data-toggle="tooltip" data-placement="top" title="Edit" onClick="showVideo('{{ subtitle.local_video }}');"><i class="fa-brands fa-youtube"></i> </button>
             {% endif %}
-    </td><td></td></tr>
+        </td>
+        <td></td>
+    </tr>
     {% endif %}
     {% endfor %}
 
-    <tr><td colspan="7"><h3>Last 10 / {{ publishedCount }} published Videos</h3></td></tr>
-    <tr><th>Title</th><th>Length</th><th>Review Date</th><th>Reviewer Name</th><th>Published</th><th>Status</th><th>#-Views</th></tr>
+    <tr><td colspan="7"><h3>{{ publishedCount }} publizierte Videos</h3></td></tr>
+    <tr><th>Titel</th><th>Länge</th><th>Review Datum</th><th>Reviewer Name</th><th>Publiziert</th><th>Status</th><th>#-Views</th></tr>
     {% for subtitle in publishedSubtitles %}
     {% set seconds = subtitle.duration %}
 
@@ -82,9 +95,10 @@ Thank you for your contribution!
         <td>{{ subtitle.translation_date }}</td>
         <td>{{ subtitle.reviewer }}</td>
         <td>{{ subtitle.translation_date }}</td>
-        <td>{{ subtitle.translation_status }} 
+        <td>
+            {{ subtitle.translation_status }}
             {% if subtitle.local_video != None %}
-                <button type="button" class="btn btn-sm" data-toggle="tooltip" data-placement="top" title="Edit" onClick="showVideo('{{ subtitle.local_video }}');"><i class="fa-brands fa-youtube"></i> </button>
+            <button type="button" class="btn btn-sm" data-toggle="tooltip" data-placement="top" title="Edit" onClick="showVideo('{{ subtitle.local_video }}');"><i class="fa-brands fa-youtube"></i> </button>
             {% endif %}
         </td>
         <td>

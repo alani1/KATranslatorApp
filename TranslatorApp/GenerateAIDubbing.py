@@ -92,8 +92,8 @@ if __name__ == '__main__':
 
     if len(args.videos) == 0:
 
-        #print("No Videos specified, generating last 3 translated videos")
-        sql = "SELECT * FROM %s.`ka-content`" % Configuration.dbDatabase + " WHERE (kind='Video' or kind='Talkthrough') AND translation_status = 'Approved' AND (local_video IS NULL OR local_video = '') GROUP BY id ORDER BY translation_date DESC LIMIT 3"
+        #print("No Videos specified, generating last 3 translated videos"), removed or kind='Talktrough' from SQL temporary until speed for Talktroughs is fixed #3
+        sql = "SELECT * FROM %s.`ka-content`" % Configuration.dbDatabase + " WHERE (kind='Video') AND translation_status = 'Approved' AND (local_video IS NULL OR local_video = '') GROUP BY id ORDER BY translation_date DESC LIMIT 3"
 
         print("No Videos specified, generating last 3 approved videos")
         with dbConnection.cursor() as cursor:
