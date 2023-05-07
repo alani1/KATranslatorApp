@@ -2,6 +2,7 @@ import csv
 
 import TranslatorApp.Configuration as Configuration
 from DBModule import getDBConnection
+import urllib
 
 
 
@@ -11,6 +12,8 @@ if __name__ == '__main__':
 
 
     connection = getDBConnection()
+    updateCnt = 0
+
 
     try:
         with connection.cursor() as cursor:
