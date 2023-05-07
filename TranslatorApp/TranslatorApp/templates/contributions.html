@@ -55,7 +55,12 @@ Team KA Deutsch e.V.
     {% for subtitle in translatedSubtitles %}
     {% if loop.index <= 10 %}
     {% set seconds = subtitle.duration %}
-    <tr><td><a href="{{ subtitle.canonical_url }}" target="_blank">{{ subtitle.course }} | {{ subtitle.unit }} || {{ subtitle.original_title }}</a></td><td>{{ seconds|int//60 }}:{{ (seconds|int%60) }}</td><td>{{ subtitle.translation_date }}</td><td>{{ subtitle.translation_status }}</td><td>{{ subtitle.listed }}</td><td></td><td></td></tr>
+    <tr><td><a href="{{ subtitle.canonical_url }}" target="_blank">{{ subtitle.course }} | {{ subtitle.unit }} || {{ subtitle.original_title }}</a></td><td>{{ seconds|int//60 }}:{{ (seconds|int%60) }}</td><td>{{ subtitle.translation_date }}</td>
+    <td>{{ subtitle.translation_status }}
+            {% if subtitle.local_video != None %}
+            <button type="button" class="btn btn-sm" data-toggle="tooltip" data-placement="top" title="Edit" onClick="showVideo('{{ subtitle.local_video }}');"><i class="fa-brands fa-youtube"></i> </button>
+            {% endif %}
+    </td><td>{{ subtitle.listed }}</td><td></td><td></td></tr>
     {% endif %}
     {% endfor %}
 
