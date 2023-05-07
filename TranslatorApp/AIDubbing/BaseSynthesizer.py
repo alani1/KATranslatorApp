@@ -151,7 +151,7 @@ class BaseSynthesizer:
         #Open file and read srt-format subtitles into array
 
         #self.subtitleFile = filename
-
+        
         # Open the .srt file
         with open(self.subtitleFile, 'r') as f:
             srt_data = f.read()
@@ -171,7 +171,7 @@ class BaseSynthesizer:
     #Merge subtitles based on length of pauses
     #this splits the subtitles and later the video into smaller chunks which reduced the time drift as german is spoken slower than english
     def merge_subtitles(self, subtitle_blocks, pause_time=0.5):
-        
+        print("merging subtitles")
         current_subtitle = dict(content='', ssml='', start=0, end=0, char_rate=0)
         current_end_time = 0
 
@@ -181,6 +181,7 @@ class BaseSynthesizer:
             lines = subtitle.split('\n')
             #print(lines)
             start_time, end_time = lines[1].split(' --> ')
+            #print("after split")
             start_time = self.time_to_seconds(start_time)
             end_time = self.time_to_seconds(end_time)
             duration = end_time - start_time
@@ -214,6 +215,8 @@ class BaseSynthesizer:
                 current_subtitle['end'] = end_time
 
             current_end_time = end_time
+
+        print("last subtitle")
         # Add the last subtitle to the merged subtitles
         current_subtitle['char_rate'] = len(current_subtitle['content']) / ( current_subtitle['end'] - current_subtitle['start'])                
         self.merged_subtitles.append(current_subtitle)
