@@ -38,7 +38,10 @@ class ElevenLabSynthesizer(BaseSynthesizer):
     
         # handle numbers 20-99
         elif number < 100:
-            return tens[number // 10] + ('' if number % 10 == 0 else 'und' + ones[number % 10])
+            if number % 10 == 0:
+                return tens[number // 10]
+            else:
+                return ones[number % 10] + 'und' + tens[number // 10]
     
         # handle larger numbers
         else:
