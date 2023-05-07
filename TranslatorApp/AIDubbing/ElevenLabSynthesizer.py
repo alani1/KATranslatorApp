@@ -49,7 +49,7 @@ class ElevenLabSynthesizer(BaseSynthesizer):
             words = ''
             while number > 0:
                 if number % 1000 != 0:
-                    words = self.spell_number_german(number % 1000) + others[i] + ' ' + words
+                    words = self.spellNumberGerman(number % 1000) + others[i] + ' ' + words
                 number //= 1000
                 i += 1
             return words.strip()
