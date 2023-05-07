@@ -22,6 +22,7 @@ class ElevenLabSynthesizer(BaseSynthesizer):
 
     #ElevenLabs Multilingual Model cannot properly spell numbers, so we need to do it ourselves
     def spellNumberGerman(self,number):
+
         # create a list of the German words for numbers 0-19
         ones = ['', 'eins', 'zwei', 'drei', 'vier', 'fünf', 'sechs', 'sieben', 'acht', 'neun', 'zehn',
                 'elf', 'zwölf', 'dreizehn', 'vierzehn', 'fünfzehn', 'sechzehn', 'siebzehn', 'achtzehn', 'neunzehn']
@@ -43,6 +44,13 @@ class ElevenLabSynthesizer(BaseSynthesizer):
             else:
                 return ones[number % 10] + 'und' + tens[number // 10]
     
+        # handle numbers 100-999
+        elif number < 1000:
+            if number % 100 == 0:
+                return ones[number // 100] + 'hundert'
+            else:
+                return ones[number // 100] + 'hundert' + self.spellNumberGerman(number % 100)
+
         # handle larger numbers
         else:
             i = 0
@@ -50,8 +58,10 @@ class ElevenLabSynthesizer(BaseSynthesizer):
             while number > 0:
                 if number % 1000 != 0:
                     words = self.spellNumberGerman(number % 1000) + others[i] + ' ' + words
-                number //= 1000
+
+                number = number // 1000
                 i += 1
+
             return words.strip()
 
 
