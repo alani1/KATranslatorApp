@@ -16,8 +16,8 @@ if __name__ == '__main__':
         with connection.cursor() as cursor:
 
             # Download the TSV file from a URL
-            #url = 'https://storage.googleapis.com/public-content-export-data/de-export-recent.tsv'
-            #urllib.request.urlretrieve(url, 'de-export-recent.tsv')
+            url = 'https://storage.googleapis.com/public-content-export-data/de-export-recent.tsv'
+            urllib.request.urlretrieve(url, 'de-export-recent.tsv')
 
             print('New Export Downloaded from Translation Portal')
             updateCnt = 0
