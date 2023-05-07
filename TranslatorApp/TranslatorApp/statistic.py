@@ -23,6 +23,7 @@ def generateCourseStatistic(course):
 
     courseData = dict()
     courseData["name"] = course
+    courseData["topicChampion"] = Configuration.topicChampion[course]
 
     dbConnection = pymysql.connect(host=Configuration.dbHost,
                 user=Configuration.dbUser,

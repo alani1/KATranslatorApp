@@ -10,9 +10,10 @@
 <h2>Focus Topics</h2>
 
 <table class="table table-striped">
-    <thead><th>Topic</th><th>Revisions</th><th>kWords Total/Todo</th><th>Videos Total/Todo (Dubbed/Subbed)</th><th>Value</th></thead>
+    <thead><th>Topic</th><th>TopicChampion</th><th>Words Todo</th><th>Videos Total/Todo (Dubbed/Subbed)</th><th>Value</th></thead>
     {% for tName, topic in courses.items() %}
-    <tr><td>{{ tName }}</td><td></td><td><b>{{ "{:,.2f}".format(topic.words.word_count / 1000) }} / {{ (topic.words.word_count - topic.words.translated_count) / 1000 }}</b></td><td><b>{{ topic.videos.total }} / {{ topic.videos.todo }}</b> ({{ topic.videos.dubbed }} / {{ topic.videos.subbed + topic.videos.sub_translated }})</td>
+    <tr><td>{{ tName }}</td><td>{{ topic.topicChampion }}</td><td><b data-toggle="tooltip" title="Total {{ "{:,.0f}".format(topic.words.word_count) }}">{{ (topic.words.word_count - topic.words.translated_count) }}</b></td>
+    <td data-toggle="tooltip" title="Total: {{ topic.videos.total }} | Dubbed: {{ topic.videos.dubbed }} | Subbed: {{ topic.videos.subbed + topic.videos.sub_translated }}"><b>{{ topic.videos.todo }} </b> / {{topic.videos.total}}</tddata-toggle="tooltip">
 
     <td>{{ "{:,.0f}".format(topic.words.word_count|float * 0.05 + topic.videos.dubbed|int * 80 + (topic.videos.subbed|int + topic.videos.sub_translated|int) * 20) }} E</td>
     </tr>
