@@ -4,7 +4,6 @@ import re
 import argparse
 from DBModule import getDBConnection
 import TranslatorApp.Configuration as Configuration
-import AIDubbing.Configuration as AIConfiguration
 
 
 from AIDubbing.AzureSynthesizer import AzureSynthesizer
@@ -25,6 +24,9 @@ def init_argparse() -> argparse.ArgumentParser:
 
     parser.add_argument('-d', '--download',
                     action='store_true', help='Only Download the Video and Subtitle')
+
+    parser.add_argument('-b', '--backgroundMusic',
+                    action='store_true', help='Mix the Background Music with synthesized voice')
 
     parser.add_argument('--audioOnly',
                     action='store_true', help='Synthesize Audio Only, no video merging (e.g. for Talk-Troughs)')
@@ -57,10 +59,10 @@ def processVideo(YTid):
 
     try:
 
-        if ( AIConfiguration.tts == "elevenlabs"):
-            synth = ElevenLabSynthesizer(YTid, kind, args.voice)
+        if ( Configuration.tts == "elevenlabs"):
+            synth = ElevenLabSynthesizer(YTid, kind, args)
         else:
-            synth = AzureSynthesizer(YTid, kind, args.voice)
+            synth = AzureSynthesizer(YTid, kind, args)
 
         #load Subtitles and generate SSML
         synth.readSubtitles()
@@ -89,12 +91,20 @@ if __name__ == '__main__':
 
 
     if len(args.videos) == 0:
-        print("No Videos specified, generating last 10 translated / approved videos")
+
+        #print("No Videos specified, generating last 3 translated videos")
+        sql = "SELECT * FROM %s.`ka-content`" % Configuration.dbDatabase + " WHERE (kind='Video' or kind='Talkthrough') AND translation_status = 'Approved' AND (local_video IS NULL OR local_video = '') GROUP BY id ORDER BY translation_date DESC LIMIT 3"
+
+        print("No Videos specified, generating last 3 approved videos")
         with dbConnection.cursor() as cursor:
             sql = "SELECT * FROM %s.`ka-content`" % Configuration.dbDatabase + " WHERE (kind='Video' or kind='Talkthrough') AND translation_status = 'Approved' AND (local_video IS NULL OR local_video = '') GROUP BY id ORDER BY translation_date DESC LIMIT 3"
             cursor.execute(sql)
             result = cursor.fetchall()
             for row in result:
+
+                #Check if approval date is newer than timestamp of local_video
+                #if (row['translation_date'] > row['local_video_date']):
+
                 print( "%s: %s with ytID %s" % (row['kind'], row['original_title'], row['youtube_id']))
                 processVideo( row['youtube_id'] )
         exit()

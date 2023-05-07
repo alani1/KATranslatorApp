@@ -47,8 +47,8 @@ def txt_to_list(txtFilePath):
 class AzureSynthesizer(BaseSynthesizer):
     """Merge Subtitles and generate SSML"""
 
-    def __init__(self, YTid, kind="Video", voice=""):
-        super().__init__(YTid, kind, voice)
+    def __init__(self, YTid, kind, args):
+        super().__init__(YTid, kind, args)
 
         self.azure_speech_key = Configuration.azure_speech_key
         self.azure_speech_region = Configuration.azure_speech_region

@@ -12,7 +12,11 @@ import requests
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from moviepy.video.compositing.concatenate import concatenate_videoclips
 from moviepy.audio.io.AudioFileClip import AudioFileClip
+from moviepy.audio.AudioClip import CompositeAudioClip
+
 from moviepy.editor import vfx, concatenate_audioclips
+import moviepy.audio.fx.all as afx
+
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -25,7 +29,7 @@ from DBModule import getDBConnection
 class BaseSynthesizer:
     """Base Syntehsizer Class to Merge Subtitles and generate Audio"""
 
-    def __init__(self, YTid, kind="Video", voice=""):
+    def __init__(self, YTid, kind, args):
         """Constructor"""
 
         self.speedFactor = 1.0
@@ -36,6 +40,8 @@ class BaseSynthesizer:
 
         self.YTid = YTid
         self.kind = kind
+
+        voice = args.voice
         # If voice exists load the Voice from Configuration File
         if (voice in AIConfiguration.voices):
             self.voice = AIConfiguration.voices[voice]
@@ -72,19 +78,32 @@ class BaseSynthesizer:
 
         self.videoURL = "https://www.youtube.com/watch?v=" + self.YTid
         self.videoFile = os.path.join(self.dataDirectory, f"{self.name}.mp4")
+        if (args.backgroundMusic):
+            self.musicFile = os.path.join(self.dataDirectory, f"{self.name}-music.mp3")
+
         self.subtitleFile = os.path.join(self.dataDirectory, f"{self.name}-de.srt")
 
         #Download Video from Youtube if it does not yet exist
-        if not os.path.isfile(self.videoFile):
+        if not os.path.isfile(self.videoFile) or args.download:
             print("Downloading Video from " + self.videoURL)
             #Use OAuth to avoid Error with age restricted videos
             youtube = pytube.YouTube(self.videoURL, use_oauth=True, allow_oauth_cache=True)
             video = youtube.streams.filter(progressive=True).order_by('resolution').desc().first()
             video.download(self.dataDirectory, f"{self.name}.mp4")
 
+            print("now separate audio and video, then isolate music")
+            # Separate Audio and Video
+            videoClip = VideoFileClip(self.videoFile)
+            audioClip = videoClip.audio
+            audioClip.write_audiofile(os.path.join(self.dataDirectory, f"{self.name}.mp3"))
+            if (args.backgroundMusic):
+                # Isolate Music currently done manually trough www.vocali.se or Audacity
+                pass
+                #musicClip.write_audiofile(self.musicFile)
+
         #Download German Subtitle from Amara.org if it does not yet exist
         #TODO
-        if not os.path.isfile(self.subtitleFile):
+        if not os.path.isfile(self.subtitleFile) or args.download:
             amaraURL = self.getAmaraSubtitleURL()
             if (len(amaraURL) > 0):
                 print("Downloading German Subtitle from %s" % amaraURL)
@@ -238,6 +257,18 @@ class BaseSynthesizer:
 
         output_clip = concatenate_audioclips(audio_segments)
 
+        # Merge the music track (musicFile) into output_clip
+        if hasattr(self, 'musicFile'):
+            print("Adding Music to Video")
+            music = AudioFileClip(self.musicFile)
+            mixed_clip = CompositeAudioClip([output_clip, music])
+            mixed_clip = mixed_clip.set_duration(output_clip.duration)
+            mixed_clip.fps = output_clip.fps
+ 
+            mixed_clip.write_audiofile(os.path.join(self.dataDirectory, f'{self.name}-withMUSIC.mp3'))   
+            
+
+
         outputFile = os.path.join(self.workingDirectory, f'{self.name}.mp3')
         output_clip.write_audiofile(outputFile)
 
@@ -266,6 +297,11 @@ class BaseSynthesizer:
         finalVideoFileName = os.path.join(self.dataDirectory, f'{self.name}-DE.mp4')
         clips = []
 
+        # create a mute audio clip used below when no background sound is used
+        muteAudio = AudioFileClip(os.path.join(self.workingDirectory, f'{self.name}.mp3'))
+        muteAudio = muteAudio.volumex(0.0)
+
+
         i = 1
         # For every subtitle chunk, create a video clip and concatenate them
         for s in self.merged_subtitles:
@@ -276,24 +312,48 @@ class BaseSynthesizer:
             videoFileName = os.path.join(self.workingDirectory, f'{self.name}-{str(i)}.mp4')
 
             audio_clip = AudioFileClip(audioFileName)
+            
             audioDuration = audio_clip.duration
+            videoDuration = float(end - start)
 
-            print("\nChunk %s: %s, %s" % (i, start, end))
+            print("\nST-Segment %s: %s, %s" % (i, start, end))
             print("Videoduration: %f" % float(end - start))
             print("Audioduration: %f" % audioDuration)
+            print("Text: %s" % s["content"])
 
+            # Get the Video Clip with length of Subtitle Chunk
             clip = video_clip.subclip(start, end)
-            # new clip with new duration, slowdown the video by Ratio
-            ratio = float(end-start) / audioDuration
-            new_clip = clip.fx( vfx.speedx,ratio)
-            myClip = new_clip.set_audio(audio_clip)
+
+            # extend length of Video Segment if Audio is longer than Video
+            if (audioDuration > videoDuration):
+                ratio = float(end-start) / audioDuration
+                clip = clip.fx( vfx.speedx,ratio)
+
+            # Mix the Audio Clip with Subclip of Music File
+            if hasattr(self, 'musicFile'):
+                print("Mixing Background Music")
+                music = AudioFileClip(self.musicFile)
+                music_clip = music.subclip(start, end)
+            else:
+                print("muting Video Music")
+                music_clip = muteAudio.subclip(0, videoDuration)
+                
+                
+            print("DE Audio Lenght: %s" % audio_clip.duration)
+            print("Music Audio Lenght: %s" % music_clip.duration)
+
+            mixed_clip = CompositeAudioClip([audio_clip, music_clip])
+            #mixed_clip.set_duration(clip.duration)
+            mixed_clip.fps = clip.fps
+
+
+            myClip = clip.set_audio(mixed_clip)
             myClip.write_videofile(videoFileName)
             clips.append(videoFileName)
 
             audio_clip.close()
             clip.close()
             myClip.close()
-            new_clip.close()
 
             i += 1
 
