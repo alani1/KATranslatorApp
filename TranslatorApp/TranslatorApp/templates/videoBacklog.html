@@ -56,7 +56,11 @@
     <a href="?filter=assigned" onclick="return setFilter('assigned')">Assigned</a>,
     <a href="?filter=publish" onclick="return setFilter('publish')">Publish</a>,
     {% endif %}
-    <a href="?filter=math13" onclick="return setFilter('math16')">Math 1-6</a>, <a href="?filter=math713" onclick="return setFilter('math713')">Math 7-13</a>, <a href="?filter=computing" onclick="return setFilter('computing')">Computing</a>
+
+    {% for domain, name in domains.items() %}
+    <a href="?filter={{ domain }}" onclick="return setFilter('{{ domain }}')">{{ name }}</a>,
+    {% endfor %}
+
 
 </h2>
 <hr />

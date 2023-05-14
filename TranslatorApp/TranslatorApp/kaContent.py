@@ -99,7 +99,6 @@ class KAContent(object):
                     cursorclass=pymysql.cursors.DictCursor)
 
     def focusCourseCondition(self, course):
-
         if not course in Configuration.focusCourses and course != 'all':
             return ''
 
@@ -111,7 +110,6 @@ class KAContent(object):
             return ', '.join(cCourses)
         else:
             courses = Configuration.focusCourses[course]['courses']
-
             cCourses = []
             for c in courses:
                 cCourses.append("'%s'" % c)
@@ -145,7 +143,6 @@ class KAContent(object):
     def loadData(self,user, filter, showAll=False):
 
         noDuplicates = False
-        
         # Only select Items which are in Backlog        
         with self.dbConnection.cursor() as cursor:
             sql = "SELECT * FROM %s.`ka-content`" % Configuration.dbDatabase
@@ -173,19 +170,17 @@ class KAContent(object):
                 noDuplicates = True
                 where.append("(translation_status = 'Assigned')")
 
+            # Include all Published Courses
             if (filter == "publish"):
                 noDuplicates = True
-                # Include all Published Courses
                 
                 where.append("( `ka-content`.dubbed = 'True' or `ka-content`.subbed = 'True' ) AND `ka-content`.listed_anywhere = 'False'")
                 where.append("course in (%s)" % self.focusCourseCondition("all"))
 
-            if (filter == "math16"):
-                where.append("course in (%s)" % filterCondition)
-            
-            if (filter == "math713"):
+            if (filter in Configuration.focusCourses):
                 where.append("course in (%s)" % filterCondition)
 
+            # For Computing we add domain = 'computing' and filter for the courses, not sure this is required
             if (filter == "computing"):
                 where.append("domain = 'computing'")
                 where.append("course in (%s)" % filterCondition)
@@ -248,16 +243,22 @@ class KAContent(object):
             domainFilter = 'math16'
             userFilter = ''
 
+        domains = {}
+        for course in Configuration.focusCourses:
+            if Configuration.focusCourses[course]['visible']:
+                domains[course] = Configuration.focusCourses[course]['name']
+
         return make_response(render_template(
             'videoBacklog.html',
             title='Show Content in the KADeutsch Backlog',
             year=datetime.now().year,
             filter=domainFilter,
+            domains=domains,
             userFilter=userFilter,
             message=self.message,
             user=self.user,
             users=self.getUsers(),
-            baseURL=Configuration.baseURL
+            baseURL=Configuration.baseURL,
         ))                             
 
 
@@ -282,7 +283,12 @@ def content():
     #Create Blueprint Object
     v = KAContent()
 
-    valid_filters = [ 'math16', 'math713', 'computing', 'approval', 'assigned', 'publish' ] # List of valid filter parameters
+    # List of valid filter parameters
+    valid_filters = [ 'approval', 'assigned', 'publish' ] 
+    for course in Configuration.focusCourses:
+        if Configuration.focusCourses[course]['visible']:
+            valid_filters.append(course)
+
     filter = ""
     iFilter = request.args.get('filter')
     if iFilter in valid_filters:

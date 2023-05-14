@@ -24,7 +24,8 @@ def generateCourseStatistic(course):
     print(course)
     courseConfig = Configuration.focusCourses[course]
     courseData = dict()
-    courseData["name"] = course
+    courseData["name"] = courseConfig['name']
+    courseData["visible"] = courseConfig['visible']
     courseData["topicChampion"] = courseConfig['topicChampion']
 
 
