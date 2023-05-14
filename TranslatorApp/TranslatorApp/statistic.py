@@ -10,7 +10,7 @@ def focusCourseCondition(course):
     if not course in Configuration.focusCourses:
         return ''
 
-    courses = Configuration.focusCourses[course]
+    courses = Configuration.focusCourses[course]['courses']
 
     cCourses = []
     for c in courses:
@@ -21,9 +21,12 @@ def focusCourseCondition(course):
 
 def generateCourseStatistic(course):
 
+    print(course)
+    courseConfig = Configuration.focusCourses[course]
     courseData = dict()
     courseData["name"] = course
-    courseData["topicChampion"] = Configuration.topicChampion[course]
+    courseData["topicChampion"] = courseConfig['topicChampion']
+
 
     dbConnection = pymysql.connect(host=Configuration.dbHost,
                 user=Configuration.dbUser,
@@ -34,6 +37,8 @@ def generateCourseStatistic(course):
 
     #Get Video Statistics
     sql = "SELECT distinct id, COUNT(*) AS total, SUM(dubbed = 'True') AS dubbed, SUM(subbed = 'True' AND dubbed = 'False') AS subbed,  SUM(translation_status = 'Approved' AND (subbed = 'False' AND dubbed = 'False') ) AS sub_translated FROM `ka-content` WHERE (kind='Video' or kind='Talkthrough') and `course` IN (%s)" % focusCourseCondition(course)
+
+    print(sql)
     
     with dbConnection.cursor() as cursor:
         elements = ""

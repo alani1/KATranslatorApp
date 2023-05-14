@@ -104,14 +104,13 @@ class KAContent(object):
             return ''
 
         if (course == 'all'):
-            print("hello world")
             cCourses = []
             for course in Configuration.focusCourses:
                 cCourses.append(self.focusCourseCondition(course))
 
             return ', '.join(cCourses)
         else:
-            courses = Configuration.focusCourses[course]
+            courses = Configuration.focusCourses[course]['courses']
 
             cCourses = []
             for c in courses:
