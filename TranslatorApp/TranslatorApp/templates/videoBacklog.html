@@ -143,6 +143,23 @@
                     <input class="form-check-input" type="checkbox" id="dubbed">
                     <label for="dubbed">Dubbed</label>
                 </div>
+
+                <div class="panel-group" id="accordion">
+                  <div class="panel panel-default">
+                    <div class="panel-heading">
+                      <h4 class="panel-title">
+                        <a data-toggle="collapse" data-parent="#accordion" href="#collapse1">
+                        Youtube Description</a>
+                      </h4>
+                    </div>
+                    <div id="collapse1" class="panel-collapse collapse">
+                      <div class="panel-body" id="ytDescriptionPanel">Lorem ipsum dolor sit amet, consectetur adipisicing elit,
+                      sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad
+                      minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea
+                      commodo consequat.</div>
+                    </div>
+                  </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
@@ -295,6 +312,9 @@
                             if ( '${row.cells[10].data}' == 'True') {
                                 $('#dubbed').prop('checked', true);
                             }
+
+                            // Set the Youtube Description
+                            $('#ytDescriptionPanel')[0].innerHTML = ytDescription['${row.cells[0].data}'];
 
                             $('#editModal').modal('show');"><i class="fa-solid fa-pen-to-square"></i></button>&nbsp`;
                         {% endif %}

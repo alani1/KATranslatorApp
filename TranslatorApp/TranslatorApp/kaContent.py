@@ -7,6 +7,8 @@ from flask import (
 import requests
 from html import unescape
 from TranslatorApp import Configuration
+from TranslatorApp.YoutubeDescriptionGenerator import DescriptionGenerator
+
 
 import pymysql
 from flask import Flask, jsonify
@@ -210,7 +212,10 @@ class KAContent(object):
             cursor.execute(sql)
             result = cursor.fetchall()
         return jsonify(result)
+
+
     
+
     def saveData(self,data):
         if (len(data)> 0):
 
@@ -221,6 +226,11 @@ class KAContent(object):
             cursor.execute(sql)
             self.dbConnection.commit()
             self.dbConnection.close()
+
+            # Generate the Youtube Description
+            ytData = DescriptionGenerator(data['id'])
+            ytData.generateYoutubeData()
+
 
             result = cursor.fetchall()
             return jsonify(result)
