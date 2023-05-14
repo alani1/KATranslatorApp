@@ -1,7 +1,7 @@
 
 from TranslatorApp import Configuration
 import AIDubbing.Configuration as AIConfiguration
-from DBModule import getDBConnection
+import DBModule
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -15,7 +15,7 @@ class DescriptionGenerator:
     def __init__(self, id):
         self.id = id
 
-        self.dbConnection = getDBConnection()
+        self.dbConnection = DBModule.getDBConnection()
         with self.dbConnection.cursor() as cursor:
             sql = "SELECT * FROM %s.`ka-content`" % Configuration.dbDatabase + " where id='%s'" % self.id
             cursor.execute(sql)
@@ -25,7 +25,7 @@ class DescriptionGenerator:
 
         #Load Data from lesson record, check the Caps for type in Kind it needs to start with capital letter
         sql = "SELECT * FROM %s.`ka-content`" % Configuration.dbDatabase + " where kind = '%s' and %s = '%s'" % (type.capitalize(), type, name)
-        dbConnection = getDBConnection()
+        dbConnection = DBModule.getDBConnection()
         with dbConnection.cursor() as cursor:
             cursor.execute(sql)
             for row in cursor.fetchall():
@@ -61,7 +61,7 @@ class DescriptionGenerator:
         #nextLesson
         #previousLesson
 
-        dbConnection = getDBConnection()
+        dbConnection = DBModule.getDBConnection()
         #select all rows with same lesson
         sql = "SELECT * FROM %s.`ka-content`" % Configuration.dbDatabase + " where lesson = '%s'" % self.dbData['lesson']
         with dbConnection.cursor() as cursor2:
