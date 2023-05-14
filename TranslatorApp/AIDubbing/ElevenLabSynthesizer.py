@@ -42,6 +42,9 @@ class ElevenLabSynthesizer(BaseSynthesizer):
             if number % 10 == 0:
                 return tens[number // 10]
             else:
+                if (number % 10 == 1):
+                    return 'ein' + 'und' + tens[number // 10]
+
                 return ones[number % 10] + 'und' + tens[number // 10]
     
         # handle numbers 100-999
