@@ -1,6 +1,7 @@
-from DBModule import getDBConnection
+
 from TranslatorApp import Configuration
 import AIDubbing.Configuration as AIConfiguration
+from DBModule import getDBConnection
 
 from jinja2 import Environment, FileSystemLoader
 
