@@ -3,6 +3,7 @@ from TranslatorApp import Configuration
 import AIDubbing.Configuration as AIConfiguration
 import DBModule
 
+from flask import render_template
 from jinja2 import Environment, FileSystemLoader
 
 
@@ -33,10 +34,6 @@ class DescriptionGenerator:
 
     # Generates the Youtube Description for the Video and save it to the DataBase
     def generateYoutubeData(self):
-
-        environment = Environment(loader=FileSystemLoader("TranslatorApp/templates"))
-        template = environment.get_template("YTDescription.txt")
-
 
         values = {}
 
@@ -89,7 +86,8 @@ class DescriptionGenerator:
         else:
             values['channelLink'] = ''
 
-        content = template.render(values)
+        content = render_template("YTDescription.txt",**values)
+        print(content)
         #print(values)
 
         # Save the generated Description to the DB
