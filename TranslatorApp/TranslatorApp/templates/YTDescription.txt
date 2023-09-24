@@ -3,10 +3,14 @@
 {{ title }}: {{ description }}
 
 Übe diese Lektion jetzt auf der deutschen Khan Academy: {{ kaLink }}
+{% if nextLesson|length %}
 
 Schaue dir die nächste Lektion an: {{ nextLesson }}
+{% endif %}
+{% if previousLesson|length %}
 
 Hast du die letzte Lektion verpasst?  {{ previousLesson }}
+{% endif %}
 
 {{ lessonDescription }}
 

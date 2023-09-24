@@ -58,17 +58,19 @@ class DescriptionGenerator:
         #previousLesson
 
         dbConnection = DBModule.getDBConnection()
-        #select all rows with same lesson
+        #select all rows with same lesson to identify the URL of next and previous lesson
         sql = "SELECT * FROM %s.`ka-content`" % Configuration.dbDatabase + " where lesson = '%s'" % self.dbData['lesson']
         with dbConnection.cursor() as cursor2:
             cursor2.execute(sql)
             contents = cursor2.fetchall()
+            print("we have so many " +  str(len(contents)))
             i = 0
             for content in contents:
                 if(content['id'] == self.dbData['id']):
                     #print("found the same id and it is row %s" % i)
                     values['previousLesson'] = contents[i-1]['canonical_url']
-                    values['nextLesson'] = contents[i+1]['canonical_url']
+                    if (i < len(contents)-1):
+                        values['nextLesson'] = contents[i+1]['canonical_url']
                 i+=1
                 
         #translator
