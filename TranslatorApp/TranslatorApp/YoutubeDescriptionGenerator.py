@@ -4,7 +4,6 @@ import AIDubbing.Configuration as AIConfiguration
 import DBModule
 
 from flask import render_template
-from jinja2 import Environment, FileSystemLoader
 
 
 # ======================================== Class to Generate Youtube Title and Description ================================================================
@@ -87,12 +86,13 @@ class DescriptionGenerator:
             values['channelLink'] = ''
 
         content = render_template("YTDescription.txt",**values)
-        print(content)
-        #print(values)
-
+        #print(content)
+        
         # Save the generated Description to the DB
 
-        sql = "UPDATE %s.`ka-content`" % Configuration.dbDatabase + " SET yt_description = '%s' where youtube_id = '%s'" % (content, self.dbData['youtube_id'] )
+        sql = "UPDATE %s.`ka-content`" % Configuration.dbDatabase + " SET yt_description = %s where youtube_id = '%s'" % (dbConnection.escape(content), self.dbData['youtube_id'] )
+        print(sql)
+        
         with dbConnection.cursor() as cursor:
             cursor.execute(sql)
         dbConnection.commit()
