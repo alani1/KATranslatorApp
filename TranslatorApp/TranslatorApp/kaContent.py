@@ -246,7 +246,14 @@ class KAContent(object):
         domains = {}
         for course in Configuration.focusCourses:
             if Configuration.focusCourses[course]['visible']:
-                domains[course] = Configuration.focusCourses[course]['name']
+                
+                # Only show those courses a user is allowed to see
+                # check if adminOnly Key is set and if the user is an admin
+                if not Configuration.focusCourses[course].get('adminOnly', False):
+                    domains[course] = Configuration.focusCourses[course]['name']
+                else:
+                    if self.user != None and self.user.role == 'administrator':
+                            domains[course] = Configuration.focusCourses[course]['name']
 
         return make_response(render_template(
             'videoBacklog.html',
