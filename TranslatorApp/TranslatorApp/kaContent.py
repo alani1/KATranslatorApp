@@ -233,14 +233,14 @@ class KAContent(object):
         else:
             print("empty data")
         
-    def render(self, domainFilter="math16"):
+    def render(self, domainFilter="math713"):
 
         user = request.args.get('user')
         if ( user != None):
             domainFilter = ''
             userFilter = user
         else:
-            domainFilter = 'math16'
+            domainFilter = 'math713'
             userFilter = ''
 
         domains = {}
