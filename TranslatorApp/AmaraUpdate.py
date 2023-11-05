@@ -43,6 +43,46 @@ def getKATranslatorName(amaraName):
         return amaraName
     return amaraName
 
+def postDiscordTranslateMessage(db,stActivity):
+
+    url = Configuration.discordWebhookURL
+    headers = {'Content-Type': 'application/json'}
+    
+    #print(db)
+    #print(stActivity)
+    amaraUser = requests.get(stActivity['user']['uri'],headers = {'X-api-key': amaraAPI} ).json()
+    amaraVideo = requests.get(stActivity['video_uri'],headers = {'X-api-key': amaraAPI} ).json()
+    #print(amaraUser)
+
+    username = stActivity['user']['username']
+    userUrl = "https://www.kadeutsch.org/TranslatorApp/contribution/" + username
+    title = db['translated_title']
+    message = "Video %s has been translated by %s" % (db['original_title'], stActivity['user']['username'])
+
+    embed = {
+        "title": "hat die Untertitel von \"%s\" ubersetzt." % title,
+        "url": userUrl,
+        "description": "Danke @%s! Bitte helft den Untertitel zu kontrollieren." % username,
+        "color": 3447003,  # Hex color code (e.g., blue)
+
+        # Optional thumbnail
+        "thumbnail": {
+            "url": amaraUser['avatar']
+        },
+        
+        "author": {
+            "name": username,
+            "url": userUrl,
+        },
+        
+        "image": {
+            "url": amaraVideo['thumbnail']
+        },
+    }
+
+    data = {"embeds": [embed]}
+    response = requests.post(url,headers=headers,data=json.dumps(data))
+
 def doSQL(sql):
     dbConnection = getDBConnection()
     cursor = dbConnection.cursor()
@@ -51,7 +91,7 @@ def doSQL(sql):
 
 if __name__ == '__main__':
     current_datetime = datetime.datetime.now()
-    weekAgo = current_datetime - datetime.timedelta(hours=3)
+    weekAgo = current_datetime - datetime.timedelta(hours=48)
 
     #convert date in form 2023-04-10T18:06:18Z to 2023-04-10
     def convertDate(date):
@@ -88,7 +128,10 @@ if __name__ == '__main__':
     url = url + "&offset=%s" % (lastOffset)
     fetchMore = True
 
-    print("Update KADeutsch Content Database with %s activities since %s from Amara" % (len(response['objects']), weekAgo.isoformat()))
+    str = "Update KADeutsch Content Database with %s activities since %s from Amara" % (len(response['objects']), weekAgo.isoformat())
+    #postDiscordMessage(str)
+    print(str)
+
 
     while fetchMore:
 
@@ -150,19 +193,27 @@ if __name__ == '__main__':
             
                 sql = "UPDATE `ka-content` SET `translation_status` = 'Translated', `translator` = '%s', `translation_date` = '%s' WHERE `youtube_id` = '%s'" % ( translator, date.split('T')[0], ytID)            
                 if len(db) > 0 and db[0]['translation_status'] == 'Assigned' and db[0]['translator'] == translator:
-                    print('%s Video "%s" translated/endorsed by %s' % ( date, db[0]['original_title'], translator ))
+                    msg = '%s Video "%s" translated/endorsed by @%s' % ( date, db[0]['original_title'], translator )
+                    postDiscordTranslateMessage(db[0],stActivity)
+                    print(msg)
+
 
                     update = update + 1
                     doSQL(sql)
 
                 else:
                     if ( not db[0]['translation_status'] == 'Translated' ):
-                        print('%s Video "%s" translated/endorsed by %s' % ( date, db[0]['original_title'], translator ))
+                        msg = '%s Video "%s" translated/endorsed by @%s' % ( date, db[0]['original_title'], translator )
+                        postDiscordTranslateMessage(db[0],stActivity)
+                        print(msg)
+                        
                         print('inconsistent state (%s,%s), still moving to Translated' % (db[0]['translation_status'], db[0]['translator']))
                         update = update + 1
                         doSQL(sql)
                     else:
-                        print('%s Video "%s" already in status Translated' % (date, db[0]['original_title']))
+                        msg = '%s Video "%s" already in status Translated' % (date, db[0]['original_title'])
+
+                        print(msg)
                         ignored = ignored + 1
 
             #Change status to reviewed
@@ -178,7 +229,10 @@ if __name__ == '__main__':
                 #Add DB field for reviewer, review_date
                 sql = "UPDATE `ka-content` SET `translation_status` = 'Approved', `reviewer` = '%s', `review_date` = '%s' WHERE `youtube_id` = '%s'" % ( reviewer, date.split('T')[0], ytID)
                 #sql = "UPDATE `ka-content` SET `translation_status` = 'Approved' WHERE `youtube_id` = '%s'" % ( ytID )
-                print('%s Video "%s" reviewed by %s' % ( date, db[0]['original_title'], reviewer ))
+                msg = '%s Video "%s" reviewed by @%s' % ( date, db[0]['original_title'], reviewer )
+                print(str)
+
+
                 update = update + 1
                 doSQL(sql)
 
