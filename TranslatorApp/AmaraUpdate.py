@@ -1,4 +1,4 @@
-import json
+﻿import json
 import requests
 import datetime
 import math
@@ -60,7 +60,7 @@ def postDiscordTranslateMessage(db,stActivity):
     message = "Video %s has been translated by %s" % (db['original_title'], stActivity['user']['username'])
 
     embed = {
-        "title": "hat die Untertitel von \"%s\" ubersetzt." % title,
+        "title": "hat die Untertitel von \"%s\" übersetzt." % title,
         "url": userUrl,
         "description": "Danke @%s! Bitte helft den Untertitel zu kontrollieren." % username,
         "color": 3447003,  # Hex color code (e.g., blue)
@@ -91,7 +91,7 @@ def doSQL(sql):
 
 if __name__ == '__main__':
     current_datetime = datetime.datetime.now()
-    weekAgo = current_datetime - datetime.timedelta(hours=48)
+    weekAgo = current_datetime - datetime.timedelta(hours=3)
 
     #convert date in form 2023-04-10T18:06:18Z to 2023-04-10
     def convertDate(date):
