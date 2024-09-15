@@ -42,7 +42,7 @@
 <h2>
     <a href="" onclick="">Allgemein</a>,
     <a href="" onclick="">Arithmetik</a>,
-    <a href="" onclick="">Algebra</a>, WorkInProgress
+    <a href="" onclick="">Algebra</a>, WorkInProgress,<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#editModal">New Entry</button>
 </h2>
 <table id="GlossaryEntryTable" class="display" width="100%"></table>
 
@@ -66,7 +66,7 @@ only for Admins / Deepl Gloassaries
                 id: "Actions", name: "Actions",
 
                 formatter: (cell, row) => {
-                    return gridjs.html(`<button type="button" class="btn btn-danger" data-toggle="modal" data-target="#editModal" onclick="editTranslator('')">Delete</button>`);
+                    return gridjs.html(`<button type="button" class="btn btn-danger" onclick="deleteGlossary('${row.cells[5].data}');">Delete</button>`);
                 }
             }
         ],
@@ -143,6 +143,36 @@ only for Admins / Deepl Gloassaries
 
     }
 
+    function deleteEntry() {
+        var id = $("#id").val();
+        $.ajax({
+            type: "DELETE",
+            url: '{{baseURL}}/glossary/entries/' + id,
+            success: function (response) {
+                grid.forceRender();
+            },
+            error: function (xhr, status, error) {
+                alert("Error: " + error);
+            }
+        });
+    }
+
+    function deleteGlossary(id) {
+
+        alert('deleteing Glossary ' + id);
+
+        $.ajax({
+            type: "DELETE",
+            url: '{{baseURL}}/glossary/deleteGlossary/' + id,
+            success: function (response) {
+                grid.forceRender();
+            },
+            error: function (xhr, status, error) {
+                alert("Error: " + error);
+            }
+        });
+    
+    }
 
 </script>
 
@@ -191,7 +221,7 @@ only for Admins / Deepl Gloassaries
 
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-danger" data-dismiss="modal">Delete</button>
+                <button type="button" class="btn btn-danger" onclick="deleteEntry()" data-dismiss="modal">Delete</button>
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                 <button type="button" class="btn btn-primary" onclick="saveEntry()">Save changes</button>
 
