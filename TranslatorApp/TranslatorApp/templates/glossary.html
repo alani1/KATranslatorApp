@@ -44,7 +44,14 @@
     <a href="" onclick="">Arithmetik</a>,
     <a href="" onclick="">Algebra</a>, WorkInProgress,
     {% if user.isAdmin() %}
-    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#editModal">New Entry</button>
+    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#editModal" onclick="
+        $('#modalTitelLabel').text('New Entry');
+        $('#id').val('');
+        $('#category').val('');
+        $('#source').val('');
+        $('#target').val('');
+        $('#comment').text('');
+    ">New Entry</button>
     {% endif %}
 </h2>
 <table id="GlossaryEntryTable" class="display" width="100%"></table>
