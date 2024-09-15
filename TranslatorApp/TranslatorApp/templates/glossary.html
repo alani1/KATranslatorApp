@@ -175,7 +175,7 @@ only for Admins / Deepl Gloassaries
             type: "DELETE",
             url: '{{baseURL}}/glossary/deleteGlossary/' + id,
             success: function (response) {
-                grid.forceRender();
+                myGrid.forceRender();
             },
             error: function (xhr, status, error) {
                 alert("Error: " + error);
