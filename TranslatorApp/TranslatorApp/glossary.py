@@ -49,6 +49,7 @@ def glossary():
         year=datetime.now().year,
         message=message,
         user=user,
+        baseURL=Configuration.baseURL,
     ))
 
 
