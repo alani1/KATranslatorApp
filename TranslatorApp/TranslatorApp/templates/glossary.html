@@ -169,8 +169,6 @@ only for Admins / Deepl Gloassaries
 
     function deleteGlossary(id) {
 
-        alert('deleteing Glossary ' + id);
-
         $.ajax({
             type: "DELETE",
             url: '{{baseURL}}/glossary/deleteGlossary/' + id,
