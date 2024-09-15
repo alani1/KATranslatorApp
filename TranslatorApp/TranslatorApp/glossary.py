@@ -149,4 +149,5 @@ def addGlossary():
         message=message,
         gloassaryList=glossaryList,
         user=user,
+        baseURL=Configuration.baseURL,
     ))
