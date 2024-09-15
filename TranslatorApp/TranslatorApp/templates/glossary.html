@@ -1,0 +1,206 @@
+﻿{% extends "layout.html" %}
+
+{% block content %}
+
+<h2>{{ title }}.</h2>
+<h3 id="msg">{{ message|safe }}</h3>
+
+<script type="text/javascript">
+    var showAll = false;
+    var user = '{{ userFilter }}'
+
+    function refreshGridOLD() {
+        if (user != '') {
+            url = '{{ baseURL }}/glossary/data?user=' + user;
+        } else {
+            url = '{{ baseURL }}/glossary/data?filter=' + filter;
+        }
+
+        if (showAll) {
+            url = url + '&showAll=1'
+        }
+        myGrid.config.server.url = url
+        myGrid.forceRender();
+    }
+
+    function setFilter(myFilter) {
+        filter = myFilter;
+        user = '';
+        refreshGrid()
+        return false;
+    }
+
+</script>
+
+
+
+
+<hr />
+
+
+
+<h2>
+    <a href="" onclick="">Allgemein</a>,
+    <a href="" onclick="">Arithmetik</a>,
+    <a href="" onclick="">Algebra</a>, WorkInProgress
+</h2>
+<table id="GlossaryEntryTable" class="display" width="100%"></table>
+
+{% if user.isAdmin() %}
+<hr />
+only for Admins / Deepl Gloassaries
+<table id="GlossaryTable" class="display" width="100%"></table>
+
+<h3>Create/Upload New Glossary:</h3>
+<form action='{{baseURL}}/glossary/addGlossary' method="post" enctype="multipart/form-data">
+    <button type="submit" class="btn btn-primary">Deepl Upload</button>
+</form>
+
+
+<script>
+
+    myGrid = new gridjs.Grid({
+        columns: [
+            'Name', 'Source', 'Target', 'Creation Date', 'Entries', 'ID',
+            {
+                id: "Actions", name: "Actions",
+
+                formatter: (cell, row) => {
+                    return gridjs.html(`<button type="button" class="btn btn-danger" data-toggle="modal" data-target="#editModal" onclick="editTranslator('')">Delete</button>`);
+                }
+            }
+        ],
+        server: {
+            url: '{{baseURL}}/glossary/data',
+            then: data => data.glossaries.map(g => [g.name, g.source_lang, g.target_lang, g.creation_time, g.entry_count, g.glossary_id]),
+        },
+    }).render(document.getElementById("GlossaryTable"));
+
+</script>
+{% endif %}
+
+<script>
+
+    var grid = new gridjs.Grid({
+        search: true,
+        sort: true,
+        pagination: {
+            limit: 10
+        },
+        columns: ['ID', 'Category', 'Source', 'Target', 'Comment',
+            {
+                id: "Actions", name: "Actions",
+
+                {% if user.isAdmin() %}
+                formatter: (cell, row) => {
+
+                    buttons = `<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#editModal" onclick="
+                        $('#modalTitelLabel').text('ID:${row.cells[0].data} - ${row.cells[1].data}/${row.cells[2].data}');
+                        $('#id').val('${row.cells[0].data}');
+                        $('#category').val('${row.cells[1].data}');
+                        $('#source').val('${row.cells[2].data}');
+                        $('#target').val('${row.cells[3].data}');
+                        $('#comment').text('${row.cells[4].data}');
+
+                    ">Edit</button>`;
+                    
+                    return gridjs.html(buttons);
+                }
+                {% endif %}
+            }
+        ],
+
+        server: {
+            url: '{{baseURL}}/glossary/entries',
+            then: data => data,
+        },
+
+    }).render(document.getElementById("GlossaryEntryTable"));
+
+
+    function saveEntry() {
+        var id = $("#id").val();
+        var category = $("#category").val();
+        var source = $("#source").val();
+        var target = $("#target").val();
+        var comment = $("#comment").val();
+
+        var data = { "category": category, "source": source, "target": target, "comment": comment };
+
+        $.ajax({
+            type: "POST",
+            url: '{{baseURL}}/glossary/entries/' + id,
+            data: JSON.stringify(data),
+            contentType: "application/json",
+            success: function (response) {
+                grid.forceRender();
+                $("#editModal").modal("hide");
+            },
+            error: function (xhr, status, error) {
+                alert("Error: " + error);
+            }
+        });
+
+    }
+
+
+</script>
+
+
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                <h5 class="modal-title" id="editGlossaryModalLabel">Edit Glossary Entry</h5>
+                <h4 class="modal-title" id="modalTitelLabel">TITLE</h4>
+            </div>
+            <div class="modal-body">
+
+                <br />
+                <input type="hidden" id="id" name="id" />
+                <div class="form-group">
+                    <label for="category">Category</label>
+                    <select type="text" class="form-control" id="category" name="category" placeholder="status">
+                        <option></option>
+                        <option value="Allgemein">Allgemein</option>
+                        <option value="Arithmetik">Arithmetik</option>
+                        <option value="Algebra">Algebra</option>
+                        <option value="Geometrie">Geometrie</option>
+                        <option value="Trigonometrie">Trigonometrie</option>
+                        <option value="Logik">Logik</option>
+                        <option value="Statistik">Statistik</option>
+                        <option value="Informatik">Informatik</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="source">Source</label>
+                    <input type="text" class="form-control" id="source" name="source" placeholder="Source">
+                </div>
+                <div class="form-group">
+                    <label for="target">Target</label>
+                    <input type="text" class="form-control" id="target" name="target" placeholder="Target">
+                </div>
+                <div class="form-group">
+                    <label for="comment">Comment</label>
+                    <textarea class="form-control" id="comment" rows="2"></textarea>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" data-dismiss="modal">Delete</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="saveEntry()">Save changes</button>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+{% endblock %}

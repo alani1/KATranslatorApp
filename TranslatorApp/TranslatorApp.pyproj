@@ -52,6 +52,7 @@
     <Compile Include="TranslatorApp\subtitle.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="TranslatorApp\user.py" />
     <Compile Include="TranslatorApp\__init__.py" />
     <Compile Include="TranslatorApp\views.py" />
   </ItemGroup>
