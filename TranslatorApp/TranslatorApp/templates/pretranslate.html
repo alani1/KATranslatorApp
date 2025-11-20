@@ -1,0 +1,434 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<h2>{{ title }}.</h2>
+<h3 id="msg">{{ message|safe }}</h3>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-8">
+            <h3>Pre-Translate Crowdin File with DeepL</h3>
+            <p>This tool downloads a file from Crowdin, translates all untranslated strings using DeepL API with informal voice, allows you to review and edit the translations, and then uploads only the selected translations back to Crowdin.</p>
+            
+            {% if user.isAdmin() %}
+            <div class="panel panel-primary">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Configuration</h3>
+                </div>
+                <div class="panel-body">
+                    <form id="pretranslateForm">
+                        <div class="form-group">
+                            <label for="crowdinApiKey">Crowdin API Key <span class="text-danger">*</span></label>
+                            <input type="password" class="form-control" id="crowdinApiKey" name="crowdinApiKey" 
+                                   placeholder="Enter your Crowdin API key" required>
+                            <small class="form-text text-muted">Your Crowdin Personal Access Token</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="projectId">Crowdin Project ID <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="projectId" name="projectId" 
+                                   placeholder="Enter Crowdin project ID" required>
+                            <small class="form-text text-muted">Numeric ID of your Crowdin project</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="fileId">Crowdin File ID <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="fileId" name="fileId" 
+                                   placeholder="Enter Crowdin file ID" required>
+                            <small class="form-text text-muted">Numeric ID of the file to translate</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="deeplApiKey">DeepL API Key <span class="text-danger">*</span></label>
+                            <input type="password" class="form-control" id="deeplApiKey" name="deeplApiKey" 
+                                   placeholder="Enter your DeepL API key" required>
+                            <small class="form-text text-muted">Your DeepL API key (Free tier supported)</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="glossaryId">DeepL Glossary ID (Optional)</label>
+                            <input type="text" class="form-control" id="glossaryId" name="glossaryId" 
+                                   placeholder="Enter DeepL glossary ID (optional)">
+                            <small class="form-text text-muted">Leave empty to translate without glossary</small>
+                        </div>
+                        
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="saveCredentials" checked>
+                            <label class="form-check-label" for="saveCredentials">
+                                Remember credentials in browser (saved locally, not on server)
+                            </label>
+                        </div>
+                        
+                        <hr>
+                        
+                        <button type="submit" class="btn btn-primary btn-lg" id="processBtn">
+                            <i class="fas fa-language"></i> Get Translations
+                        </button>
+                        <button type="button" class="btn btn-warning" id="clearBtn" onclick="clearCredentials()">
+                            <i class="fas fa-eraser"></i> Clear Saved Credentials
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="panel panel-success" id="translationPanel" style="display: none;">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Review Translations</h3>
+                </div>
+                <div class="panel-body">
+                    <p>Review and edit the translations below. Uncheck any translations you don't want to upload.</p>
+                    
+                    <div style="max-height: 500px; overflow-y: auto;">
+                        <table class="table table-striped table-bordered" id="translationsTable">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px;">
+                                        <input type="checkbox" id="selectAll" checked title="Select/Deselect All">
+                                    </th>
+                                    <th style="width: 45%;">English (Source)</th>
+                                    <th style="width: 45%;">German (Translation)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="translationsBody">
+                                <!-- Translations will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <hr>
+                    
+                    <button type="button" class="btn btn-success btn-lg" id="uploadBtn" onclick="uploadTranslations()">
+                        <i class="fas fa-upload"></i> Upload to Crowdin
+                    </button>
+                    <button type="button" class="btn btn-default" onclick="cancelReview()">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                </div>
+            </div>
+            
+            <div class="panel panel-info" id="resultPanel" style="display: none;">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Upload Result</h3>
+                </div>
+                <div class="panel-body" id="resultBody">
+                    <!-- Results will be displayed here -->
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-warning">
+                <strong>Access Denied!</strong> Only administrators can access the pre-translation feature.
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="col-md-4">
+            <div class="panel panel-info">
+                <div class="panel-heading">
+                    <h3 class="panel-title">How to Use</h3>
+                </div>
+                <div class="panel-body">
+                    <ol>
+                        <li>Enter your Crowdin API key (Personal Access Token)</li>
+                        <li>Enter your Crowdin Project ID</li>
+                        <li>Enter the File ID you want to pre-translate</li>
+                        <li>Enter your DeepL API key (Free tier supported)</li>
+                        <li>Optionally enter a DeepL Glossary ID</li>
+                        <li>Click "Get Translations"</li>
+                        <li>Review and edit translations in the table</li>
+                        <li>Uncheck any translations you don't want to upload</li>
+                        <li>Click "Upload to Crowdin"</li>
+                    </ol>
+                    
+                    <h4>Finding IDs:</h4>
+                    <ul>
+                        <li><strong>Project ID:</strong> Found in Crowdin project settings or URL</li>
+                        <li><strong>File ID:</strong> Found in Crowdin file settings or via API</li>
+                        <li><strong>Glossary ID:</strong> Available in <a href="{{baseURL}}/glossary">Glossary Management</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="panel panel-success">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Features</h3>
+                </div>
+                <div class="panel-body">
+                    <ul>
+                        <li><i class="fas fa-download"></i> Downloads file from Crowdin</li>
+                        <li><i class="fas fa-language"></i> Translates with DeepL (informal voice)</li>
+                        <li><i class="fas fa-edit"></i> Review and edit translations before upload</li>
+                        <li><i class="fas fa-check-square"></i> Select which translations to upload</li>
+                        <li><i class="fas fa-book"></i> Supports DeepL glossaries</li>
+                        <li><i class="fas fa-upload"></i> Uploads only selected translations</li>
+                        <li><i class="fas fa-save"></i> Saves credentials locally in browser</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Global variable to store current translations
+    var currentTranslations = [];
+    
+    // Load saved credentials from localStorage on page load
+    $(document).ready(function() {
+        loadCredentials();
+        
+        // Handle select all checkbox
+        $('#selectAll').change(function() {
+            $('.translation-checkbox').prop('checked', this.checked);
+        });
+    });
+    
+    function loadCredentials() {
+        var saved = localStorage.getItem('crowdinPreTranslateConfig');
+        if (saved) {
+            try {
+                var config = JSON.parse(saved);
+                $('#crowdinApiKey').val(config.crowdinApiKey || '');
+                $('#projectId').val(config.projectId || '');
+                $('#fileId').val(config.fileId || '');
+                $('#deeplApiKey').val(config.deeplApiKey || '');
+                $('#glossaryId').val(config.glossaryId || '');
+            } catch (e) {
+                console.error('Error loading credentials:', e);
+            }
+        }
+    }
+    
+    function saveCredentials() {
+        if ($('#saveCredentials').is(':checked')) {
+            var config = {
+                crowdinApiKey: $('#crowdinApiKey').val(),
+                projectId: $('#projectId').val(),
+                fileId: $('#fileId').val(),
+                deeplApiKey: $('#deeplApiKey').val(),
+                glossaryId: $('#glossaryId').val()
+            };
+            localStorage.setItem('crowdinPreTranslateConfig', JSON.stringify(config));
+        }
+    }
+    
+    function clearCredentials() {
+        localStorage.removeItem('crowdinPreTranslateConfig');
+        $('#crowdinApiKey').val('');
+        $('#projectId').val('');
+        $('#fileId').val('');
+        $('#deeplApiKey').val('');
+        $('#glossaryId').val('');
+        $('#translationPanel').hide();
+        $('#resultPanel').hide();
+        alert('Saved credentials cleared!');
+    }
+    
+    function cancelReview() {
+        $('#translationPanel').hide();
+        currentTranslations = [];
+    }
+    
+    // Handle form submission - Step 1: Get translations
+    $('#pretranslateForm').submit(function(e) {
+        e.preventDefault();
+        
+        // Save credentials if checkbox is checked
+        saveCredentials();
+        
+        // Disable button and show loading state
+        var $btn = $('#processBtn');
+        $btn.prop('disabled', true);
+        $btn.html('<i class="fas fa-spinner fa-spin"></i> Getting Translations...');
+        
+        // Hide previous results
+        $('#translationPanel').hide();
+        $('#resultPanel').hide();
+        
+        // Collect form data
+        var data = {
+            crowdinApiKey: $('#crowdinApiKey').val(),
+            projectId: $('#projectId').val(),
+            fileId: $('#fileId').val(),
+            deeplApiKey: $('#deeplApiKey').val(),
+            glossaryId: $('#glossaryId').val()
+        };
+        
+        // Send request to backend
+        $.ajax({
+            type: 'POST',
+            url: '{{baseURL}}/pretranslate/translate',
+            data: JSON.stringify(data),
+            contentType: 'application/json',
+            success: function(response) {
+                if (response.success && response.translations) {
+                    displayTranslations(response.translations);
+                } else if (response.success && response.message) {
+                    displayInfo(response.message);
+                } else {
+                    displayError(response.errors || ['Unknown error occurred']);
+                }
+                $btn.prop('disabled', false);
+                $btn.html('<i class="fas fa-language"></i> Get Translations');
+            },
+            error: function(xhr, status, error) {
+                var errorMsg = 'Error: ' + error;
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = 'Error: ' + xhr.responseJSON.error;
+                }
+                displayError([errorMsg]);
+                $btn.prop('disabled', false);
+                $btn.html('<i class="fas fa-language"></i> Get Translations');
+            }
+        });
+    });
+    
+    function displayTranslations(translations) {
+        currentTranslations = translations;
+        
+        var tbody = $('#translationsBody');
+        tbody.empty();
+        
+        translations.forEach(function(item, index) {
+            var row = $('<tr>');
+            
+            // Checkbox cell
+            var checkboxCell = $('<td>').append(
+                $('<input>').attr({
+                    type: 'checkbox',
+                    class: 'translation-checkbox',
+                    'data-index': index,
+                    checked: true
+                })
+            );
+            
+            // Source (English) cell
+            var sourceCell = $('<td>').text(item.source);
+            
+            // Translation (German) cell - editable
+            var translationCell = $('<td>').append(
+                $('<textarea>').attr({
+                    class: 'form-control translation-text',
+                    'data-index': index,
+                    rows: 2
+                }).val(item.translation)
+            );
+            
+            row.append(checkboxCell, sourceCell, translationCell);
+            tbody.append(row);
+        });
+        
+        $('#translationPanel').show();
+        
+        // Scroll to the translation panel
+        $('html, body').animate({
+            scrollTop: $('#translationPanel').offset().top - 100
+        }, 500);
+    }
+    
+    function uploadTranslations() {
+        // Collect selected and edited translations
+        var selectedTranslations = [];
+        
+        $('.translation-checkbox:checked').each(function() {
+            var index = $(this).data('index');
+            var translation = currentTranslations[index];
+            var editedText = $('.translation-text[data-index="' + index + '"]').val();
+            
+            selectedTranslations.push({
+                key: translation.key,
+                source: translation.source,
+                translation: editedText
+            });
+        });
+        
+        if (selectedTranslations.length === 0) {
+            alert('Please select at least one translation to upload.');
+            return;
+        }
+        
+        // Disable button and show loading state
+        var $btn = $('#uploadBtn');
+        $btn.prop('disabled', true);
+        $btn.html('<i class="fas fa-spinner fa-spin"></i> Uploading...');
+        
+        var data = {
+            crowdinApiKey: $('#crowdinApiKey').val(),
+            projectId: $('#projectId').val(),
+            fileId: $('#fileId').val(),
+            translations: selectedTranslations
+        };
+        
+        // Send request to backend
+        $.ajax({
+            type: 'POST',
+            url: '{{baseURL}}/pretranslate/upload',
+            data: JSON.stringify(data),
+            contentType: 'application/json',
+            success: function(response) {
+                if (response.success) {
+                    displayUploadSuccess(response.uploaded);
+                    $('#translationPanel').hide();
+                } else {
+                    displayError(response.errors || ['Upload failed']);
+                }
+                $btn.prop('disabled', false);
+                $btn.html('<i class="fas fa-upload"></i> Upload to Crowdin');
+            },
+            error: function(xhr, status, error) {
+                var errorMsg = 'Error: ' + error;
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = 'Error: ' + xhr.responseJSON.error;
+                }
+                displayError([errorMsg]);
+                $btn.prop('disabled', false);
+                $btn.html('<i class="fas fa-upload"></i> Upload to Crowdin');
+            }
+        });
+    }
+    
+    function displayUploadSuccess(count) {
+        var html = '<div class="alert alert-success">';
+        html += '<h4><i class="fas fa-check-circle"></i> Upload Completed Successfully!</h4>';
+        html += '<p>Successfully uploaded ' + count + ' translation(s) to Crowdin.</p>';
+        html += '</div>';
+        
+        $('#resultBody').html(html);
+        $('#resultPanel').show();
+        
+        // Scroll to result
+        $('html, body').animate({
+            scrollTop: $('#resultPanel').offset().top - 100
+        }, 500);
+    }
+    
+    function displayInfo(message) {
+        var html = '<div class="alert alert-info">';
+        html += '<h4><i class="fas fa-info-circle"></i> Information</h4>';
+        html += '<p>' + message + '</p>';
+        html += '</div>';
+        
+        $('#resultBody').html(html);
+        $('#resultPanel').show();
+    }
+    
+    function displayError(errors) {
+        var html = '<div class="alert alert-danger">';
+        html += '<h4><i class="fas fa-exclamation-triangle"></i> Error</h4>';
+        if (Array.isArray(errors) && errors.length > 0) {
+            html += '<ul>';
+            errors.forEach(function(error) {
+                html += '<li>' + error + '</li>';
+            });
+            html += '</ul>';
+        } else {
+            html += '<p>' + errors + '</p>';
+        }
+        html += '</div>';
+        
+        $('#resultBody').html(html);
+        $('#resultPanel').show();
+    }
+</script>
+
+{% endblock %}
