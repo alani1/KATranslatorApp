@@ -141,7 +141,7 @@ def crowdinUploadTranslation(projectId, fileId, apiKey, content, targetLang='de'
             'error': f"Exception during upload: {str(e)}"
         }
 
-def deeplTranslateStrings(strings, apiKey, glossaryId=None, sourceLang='en', targetLang='de'):
+def deeplTranslateStrings(strings, apiKey, glossaryId=None, sourceLang='en', targetLang='de', formality='less'):
     """
     Translate strings using DeepL API
     
@@ -151,6 +151,7 @@ def deeplTranslateStrings(strings, apiKey, glossaryId=None, sourceLang='en', tar
         glossaryId: Optional DeepL glossary ID
         sourceLang: Source language code (default: 'en')
         targetLang: Target language code (default: 'de')
+        formality: Formality level - 'less' for informal (default), 'more' for formal
     
     Returns:
         dict: Translated strings
@@ -171,7 +172,8 @@ def deeplTranslateStrings(strings, apiKey, glossaryId=None, sourceLang='en', tar
             data = {
                 'text': batch,
                 'source_lang': sourceLang.upper(),
-                'target_lang': targetLang.upper()
+                'target_lang': targetLang.upper(),
+                'formality': formality
             }
             
             if glossaryId:
@@ -199,6 +201,156 @@ def deeplTranslateStrings(strings, apiKey, glossaryId=None, sourceLang='en', tar
             'success': False,
             'error': f"Exception during translation: {str(e)}"
         }
+
+def getTranslationsForReview(projectId, fileId, crowdinApiKey, deeplApiKey, glossaryId=None):
+    """
+    Download file, translate, and return translations for user review
+    Does NOT upload to Crowdin yet
+    
+    Args:
+        projectId: Crowdin project ID
+        fileId: Crowdin file ID
+        crowdinApiKey: Crowdin API key
+        deeplApiKey: DeepL API key
+        glossaryId: Optional DeepL glossary ID
+    
+    Returns:
+        dict: Translation pairs for review
+    """
+    result = {
+        'success': False,
+        'translations': [],
+        'errors': []
+    }
+    
+    # Step 1: Download file from Crowdin
+    download_result = crowdinDownloadFile(projectId, fileId, crowdinApiKey)
+    if not download_result['success']:
+        result['errors'].append(download_result['error'])
+        return result
+    
+    # Parse the content (assuming JSON format)
+    try:
+        import json
+        file_content = json.loads(download_result['content'])
+    except Exception as e:
+        result['errors'].append(f"Failed to parse file content: {str(e)}")
+        return result
+    
+    # Step 2: Identify untranslated strings
+    untranslated_strings = []
+    string_keys = []
+    
+    # Handle different file formats
+    if isinstance(file_content, dict):
+        for key, value in file_content.items():
+            if isinstance(value, str):
+                # Simple key-value format
+                if not value or value == key:
+                    untranslated_strings.append(key)
+                    string_keys.append(key)
+            elif isinstance(value, dict) and 'translation' in value:
+                # Structured format with translation field
+                if not value.get('translation'):
+                    untranslated_strings.append(value.get('source', key))
+                    string_keys.append(key)
+    
+    if not untranslated_strings:
+        result['success'] = True
+        result['message'] = "No untranslated strings found"
+        return result
+    
+    # Step 3: Translate via DeepL with informal formality
+    translation_result = deeplTranslateStrings(
+        untranslated_strings,
+        deeplApiKey,
+        glossaryId=glossaryId,
+        formality='less'  # Use informal voice
+    )
+    
+    if not translation_result['success']:
+        result['errors'].append(translation_result['error'])
+        return result
+    
+    # Step 4: Prepare translation pairs for review
+    translations = translation_result['translations']
+    translation_pairs = []
+    
+    for i, key in enumerate(string_keys):
+        if i < len(translations):
+            translation_pairs.append({
+                'key': key,
+                'source': untranslated_strings[i],
+                'translation': translations[i]
+            })
+    
+    result['success'] = True
+    result['translations'] = translation_pairs
+    
+    return result
+
+def uploadReviewedTranslations(projectId, fileId, crowdinApiKey, translationPairs):
+    """
+    Upload reviewed and approved translations to Crowdin
+    
+    Args:
+        projectId: Crowdin project ID
+        fileId: Crowdin file ID
+        crowdinApiKey: Crowdin API key
+        translationPairs: List of translation pairs with key, source, translation
+    
+    Returns:
+        dict: Upload result
+    """
+    result = {
+        'success': False,
+        'uploaded': 0,
+        'errors': []
+    }
+    
+    try:
+        import json
+        
+        # Download the original file to get the structure
+        download_result = crowdinDownloadFile(projectId, fileId, crowdinApiKey)
+        if not download_result['success']:
+            result['errors'].append(download_result['error'])
+            return result
+        
+        file_content = json.loads(download_result['content'])
+        
+        # Update file content with reviewed translations
+        for pair in translationPairs:
+            key = pair['key']
+            translation = pair['translation']
+            
+            if key in file_content:
+                if isinstance(file_content[key], str):
+                    file_content[key] = translation
+                elif isinstance(file_content[key], dict):
+                    file_content[key]['translation'] = translation
+        
+        # Upload to Crowdin
+        updated_content = json.dumps(file_content, ensure_ascii=False, indent=2)
+        upload_result = crowdinUploadTranslation(
+            projectId,
+            fileId,
+            crowdinApiKey,
+            updated_content
+        )
+        
+        if not upload_result['success']:
+            result['errors'].append(upload_result['error'])
+            return result
+        
+        result['uploaded'] = len(translationPairs)
+        result['success'] = True
+        
+        return result
+        
+    except Exception as e:
+        result['errors'].append(f"Exception during upload: {str(e)}")
+        return result
 
 def processPreTranslation(projectId, fileId, crowdinApiKey, deeplApiKey, glossaryId=None):
     """
@@ -340,9 +492,103 @@ def pretranslate():
         baseURL=Configuration.baseURL,
     ))
 
+@bp.route('/translate', methods=['POST'])
+def translate():
+    """Get translations for review (Step 1)"""
+    db = connectDB()
+    user = User(db)
+    
+    if not user.isAdmin():
+        return jsonify({
+            'success': False,
+            'error': 'User does not have proper permissions'
+        }), 403
+    
+    try:
+        data = request.get_json()
+        
+        projectId = data.get('projectId')
+        fileId = data.get('fileId')
+        crowdinApiKey = data.get('crowdinApiKey')
+        deeplApiKey = data.get('deeplApiKey')
+        glossaryId = data.get('glossaryId')
+        
+        # Validate required parameters
+        if not all([projectId, fileId, crowdinApiKey, deeplApiKey]):
+            return jsonify({
+                'success': False,
+                'error': 'Missing required parameters'
+            }), 400
+        
+        # Get translations for review
+        result = getTranslationsForReview(
+            projectId,
+            fileId,
+            crowdinApiKey,
+            deeplApiKey,
+            glossaryId if glossaryId else None
+        )
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Exception: {str(e)}'
+        }), 500
+
+@bp.route('/upload', methods=['POST'])
+def upload():
+    """Upload reviewed translations to Crowdin (Step 2)"""
+    db = connectDB()
+    user = User(db)
+    
+    if not user.isAdmin():
+        return jsonify({
+            'success': False,
+            'error': 'User does not have proper permissions'
+        }), 403
+    
+    try:
+        data = request.get_json()
+        
+        projectId = data.get('projectId')
+        fileId = data.get('fileId')
+        crowdinApiKey = data.get('crowdinApiKey')
+        translationPairs = data.get('translations', [])
+        
+        # Validate required parameters
+        if not all([projectId, fileId, crowdinApiKey]):
+            return jsonify({
+                'success': False,
+                'error': 'Missing required parameters'
+            }), 400
+        
+        if not translationPairs:
+            return jsonify({
+                'success': False,
+                'error': 'No translations to upload'
+            }), 400
+        
+        # Upload reviewed translations
+        result = uploadReviewedTranslations(
+            projectId,
+            fileId,
+            crowdinApiKey,
+            translationPairs
+        )
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Exception: {str(e)}'
+        }), 500
+
 @bp.route('/process', methods=['POST'])
 def process():
-    """Process pre-translation request"""
+    """Process pre-translation request (legacy endpoint - now redirects to two-step flow)"""
     db = connectDB()
     user = User(db)
     
