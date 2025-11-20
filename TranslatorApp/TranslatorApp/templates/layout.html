@@ -37,6 +37,7 @@
                     <li><a href="{{ url_for('KAContent.videoBacklog') }}">Backlog</a></li>
                     <li><a href="{{ url_for('KAStatistic.statistic') }}">Stat</a></li>
                     <li><a href="{{ url_for('KAGlossary.glossary') }}">Glossary</a></li>
+                    <li><a href="{{ url_for('CrowdinPreTranslate.pretranslate') }}">Pre-Translate</a></li>
                     {% if user is defined and user['name']|length == 0 %}
                     <li><a target="_blank" href="/wp-login.php?redirect_to=TranslatorApp">Login</a></li>
                     {% else %}

@@ -1,0 +1,269 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<h2>{{ title }}.</h2>
+<h3 id="msg">{{ message|safe }}</h3>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-8">
+            <h3>Pre-Translate Crowdin File with DeepL</h3>
+            <p>This tool automatically downloads a file from Crowdin, translates all untranslated strings using DeepL API, and uploads the result back to Crowdin.</p>
+            
+            {% if user.isAdmin() %}
+            <div class="panel panel-primary">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Configuration</h3>
+                </div>
+                <div class="panel-body">
+                    <form id="pretranslateForm">
+                        <div class="form-group">
+                            <label for="crowdinApiKey">Crowdin API Key <span class="text-danger">*</span></label>
+                            <input type="password" class="form-control" id="crowdinApiKey" name="crowdinApiKey" 
+                                   placeholder="Enter your Crowdin API key" required>
+                            <small class="form-text text-muted">Your Crowdin Personal Access Token</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="projectId">Crowdin Project ID <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="projectId" name="projectId" 
+                                   placeholder="Enter Crowdin project ID" required>
+                            <small class="form-text text-muted">Numeric ID of your Crowdin project</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="fileId">Crowdin File ID <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="fileId" name="fileId" 
+                                   placeholder="Enter Crowdin file ID" required>
+                            <small class="form-text text-muted">Numeric ID of the file to translate</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="deeplApiKey">DeepL API Key <span class="text-danger">*</span></label>
+                            <input type="password" class="form-control" id="deeplApiKey" name="deeplApiKey" 
+                                   placeholder="Enter your DeepL API key" required>
+                            <small class="form-text text-muted">Your DeepL API key (Free tier supported)</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="glossaryId">DeepL Glossary ID (Optional)</label>
+                            <input type="text" class="form-control" id="glossaryId" name="glossaryId" 
+                                   placeholder="Enter DeepL glossary ID (optional)">
+                            <small class="form-text text-muted">Leave empty to translate without glossary</small>
+                        </div>
+                        
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="saveCredentials" checked>
+                            <label class="form-check-label" for="saveCredentials">
+                                Remember credentials in browser (saved locally, not on server)
+                            </label>
+                        </div>
+                        
+                        <hr>
+                        
+                        <button type="submit" class="btn btn-primary btn-lg" id="processBtn">
+                            <i class="fas fa-language"></i> Start Pre-Translation
+                        </button>
+                        <button type="button" class="btn btn-warning" id="clearBtn" onclick="clearCredentials()">
+                            <i class="fas fa-eraser"></i> Clear Saved Credentials
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="panel panel-info" id="resultPanel" style="display: none;">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Translation Result</h3>
+                </div>
+                <div class="panel-body" id="resultBody">
+                    <!-- Results will be displayed here -->
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-warning">
+                <strong>Access Denied!</strong> Only administrators can access the pre-translation feature.
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="col-md-4">
+            <div class="panel panel-info">
+                <div class="panel-heading">
+                    <h3 class="panel-title">How to Use</h3>
+                </div>
+                <div class="panel-body">
+                    <ol>
+                        <li>Enter your Crowdin API key (Personal Access Token)</li>
+                        <li>Enter your Crowdin Project ID</li>
+                        <li>Enter the File ID you want to pre-translate</li>
+                        <li>Enter your DeepL API key (Free tier supported)</li>
+                        <li>Optionally enter a DeepL Glossary ID</li>
+                        <li>Click "Start Pre-Translation"</li>
+                    </ol>
+                    
+                    <h4>Finding IDs:</h4>
+                    <ul>
+                        <li><strong>Project ID:</strong> Found in Crowdin project settings or URL</li>
+                        <li><strong>File ID:</strong> Found in Crowdin file settings or via API</li>
+                        <li><strong>Glossary ID:</strong> Available in <a href="{{baseURL}}/glossary">Glossary Management</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="panel panel-success">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Features</h3>
+                </div>
+                <div class="panel-body">
+                    <ul>
+                        <li><i class="fas fa-download"></i> Downloads file from Crowdin</li>
+                        <li><i class="fas fa-language"></i> Translates untranslated strings with DeepL</li>
+                        <li><i class="fas fa-book"></i> Supports DeepL glossaries</li>
+                        <li><i class="fas fa-upload"></i> Uploads translations back to Crowdin</li>
+                        <li><i class="fas fa-save"></i> Saves credentials locally in browser</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Load saved credentials from localStorage on page load
+    $(document).ready(function() {
+        loadCredentials();
+    });
+    
+    function loadCredentials() {
+        var saved = localStorage.getItem('crowdinPreTranslateConfig');
+        if (saved) {
+            try {
+                var config = JSON.parse(saved);
+                $('#crowdinApiKey').val(config.crowdinApiKey || '');
+                $('#projectId').val(config.projectId || '');
+                $('#fileId').val(config.fileId || '');
+                $('#deeplApiKey').val(config.deeplApiKey || '');
+                $('#glossaryId').val(config.glossaryId || '');
+            } catch (e) {
+                console.error('Error loading credentials:', e);
+            }
+        }
+    }
+    
+    function saveCredentials() {
+        if ($('#saveCredentials').is(':checked')) {
+            var config = {
+                crowdinApiKey: $('#crowdinApiKey').val(),
+                projectId: $('#projectId').val(),
+                fileId: $('#fileId').val(),
+                deeplApiKey: $('#deeplApiKey').val(),
+                glossaryId: $('#glossaryId').val()
+            };
+            localStorage.setItem('crowdinPreTranslateConfig', JSON.stringify(config));
+        }
+    }
+    
+    function clearCredentials() {
+        localStorage.removeItem('crowdinPreTranslateConfig');
+        $('#crowdinApiKey').val('');
+        $('#projectId').val('');
+        $('#fileId').val('');
+        $('#deeplApiKey').val('');
+        $('#glossaryId').val('');
+        $('#resultPanel').hide();
+        alert('Saved credentials cleared!');
+    }
+    
+    // Handle form submission
+    $('#pretranslateForm').submit(function(e) {
+        e.preventDefault();
+        
+        // Save credentials if checkbox is checked
+        saveCredentials();
+        
+        // Disable button and show loading state
+        var $btn = $('#processBtn');
+        $btn.prop('disabled', true);
+        $btn.html('<i class="fas fa-spinner fa-spin"></i> Processing...');
+        
+        // Hide previous results
+        $('#resultPanel').hide();
+        
+        // Collect form data
+        var data = {
+            crowdinApiKey: $('#crowdinApiKey').val(),
+            projectId: $('#projectId').val(),
+            fileId: $('#fileId').val(),
+            deeplApiKey: $('#deeplApiKey').val(),
+            glossaryId: $('#glossaryId').val()
+        };
+        
+        // Send request to backend
+        $.ajax({
+            type: 'POST',
+            url: '{{baseURL}}/pretranslate/process',
+            data: JSON.stringify(data),
+            contentType: 'application/json',
+            success: function(response) {
+                displayResult(response);
+                $btn.prop('disabled', false);
+                $btn.html('<i class="fas fa-language"></i> Start Pre-Translation');
+            },
+            error: function(xhr, status, error) {
+                var errorMsg = 'Error: ' + error;
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = 'Error: ' + xhr.responseJSON.error;
+                }
+                displayError(errorMsg);
+                $btn.prop('disabled', false);
+                $btn.html('<i class="fas fa-language"></i> Start Pre-Translation');
+            }
+        });
+    });
+    
+    function displayResult(result) {
+        var html = '';
+        
+        if (result.success) {
+            html += '<div class="alert alert-success">';
+            html += '<h4><i class="fas fa-check-circle"></i> Translation Completed Successfully!</h4>';
+            html += '<ul>';
+            html += '<li>Files downloaded: ' + result.downloaded + '</li>';
+            html += '<li>Untranslated strings found: ' + result.untranslated + '</li>';
+            html += '<li>Strings translated: ' + result.translated + '</li>';
+            html += '<li>Files uploaded: ' + result.uploaded + '</li>';
+            html += '</ul>';
+            if (result.message) {
+                html += '<p>' + result.message + '</p>';
+            }
+            html += '</div>';
+        } else {
+            html += '<div class="alert alert-danger">';
+            html += '<h4><i class="fas fa-exclamation-triangle"></i> Translation Failed</h4>';
+            if (result.errors && result.errors.length > 0) {
+                html += '<ul>';
+                result.errors.forEach(function(error) {
+                    html += '<li>' + error + '</li>';
+                });
+                html += '</ul>';
+            }
+            html += '</div>';
+        }
+        
+        $('#resultBody').html(html);
+        $('#resultPanel').show();
+    }
+    
+    function displayError(errorMsg) {
+        var html = '<div class="alert alert-danger">';
+        html += '<h4><i class="fas fa-exclamation-triangle"></i> Error</h4>';
+        html += '<p>' + errorMsg + '</p>';
+        html += '</div>';
+        
+        $('#resultBody').html(html);
+        $('#resultPanel').show();
+    }
+</script>
+
+{% endblock %}
