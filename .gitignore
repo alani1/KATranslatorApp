@@ -367,4 +367,4 @@ FodyWeavers.xsd
 /TranslatorApp/TranslatorApp/static/data
 
 # Configuration file with sensitive credentials
-/TranslatorApp/Configuration.py
+/TranslatorApp/TranslatorApp/Configuration.py
