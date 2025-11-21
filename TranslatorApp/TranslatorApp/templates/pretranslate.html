@@ -9,7 +9,12 @@
     <div class="row">
         <div class="col-md-8">
             <h3>Pre-Translate Crowdin File with DeepL</h3>
-            <p>This tool downloads a file from Crowdin, identifies strings without German translations, translates them using DeepL API with informal voice, allows you to review and edit the translations, and then uploads only the selected translations back to Crowdin.</p>
+            <p>This tool follows a three-step process:</p>
+            <ol>
+                <li><strong>Fetch Strings:</strong> Downloads strings from Crowdin including existing German translations</li>
+                <li><strong>Translate:</strong> Translates selected strings using DeepL API (informal voice)</li>
+                <li><strong>Upload:</strong> Uploads reviewed translations back to Crowdin</li>
+            </ol>
             
             {% if user.isAdmin() %}
             <div class="panel panel-primary">
@@ -62,8 +67,8 @@
                         
                         <hr>
                         
-                        <button type="submit" class="btn btn-primary btn-lg" id="processBtn">
-                            <i class="fas fa-language"></i> Get Translations
+                        <button type="submit" class="btn btn-primary btn-lg" id="fetchBtn">
+                            <i class="fas fa-download"></i> Step 1: Fetch Strings from Crowdin
                         </button>
                         <button type="button" class="btn btn-info" id="checkUsageBtn" onclick="checkDeeplUsage()">
                             <i class="fas fa-chart-bar"></i> Check DeepL Usage
@@ -86,17 +91,24 @@
             
             <div class="panel panel-success" id="translationPanel" style="display: none; position: relative; left: 50%; right: 50%; margin-left: -50vw; margin-right: -50vw; width: 100vw;">
                 <div class="panel-heading">
-                    <h3 class="panel-title">Review Translations</h3>
+                    <h3 class="panel-title">Review and Translate Strings</h3>
                 </div>
                 <div class="panel-body" style="padding-left: 15px; padding-right: 15px;">
-                    <p>Review and edit the translations below. Uncheck any translations you don't want to upload.</p>
+                    <p id="translationPanelDescription">Select the strings you want to translate with DeepL. Strings with existing German translations are unchecked by default.</p>
+                    
+                    <div id="translateButtonContainer" style="margin-bottom: 15px;">
+                        <button type="button" class="btn btn-primary btn-lg" id="translateBtn" onclick="translateSelectedStrings()">
+                            <i class="fas fa-language"></i> Step 2: Translate Selected Strings with DeepL
+                        </button>
+                        <span id="selectionCount" style="margin-left: 15px; font-weight: bold;"></span>
+                    </div>
                     
                     <div style="max-height: 70vh; overflow-y: auto;">
                         <table class="table table-striped table-bordered" id="translationsTable" style="table-layout: fixed; width: 100%;">
                             <thead>
                                 <tr>
                                     <th style="width: 50px;">
-                                        <input type="checkbox" id="selectAll" checked title="Select/Deselect All">
+                                        <input type="checkbox" id="selectAll" title="Select/Deselect All">
                                     </th>
                                     <th style="width: 45%;">English (Source)</th>
                                     <th style="width: 45%;">German (Translation)</th>
@@ -111,7 +123,7 @@
                     <hr>
                     
                     <button type="button" class="btn btn-success btn-lg" id="uploadBtn" onclick="uploadTranslations()">
-                        <i class="fas fa-upload"></i> Upload to Crowdin
+                        <i class="fas fa-upload"></i> Step 3: Upload to Crowdin
                     </button>
                     <button type="button" class="btn btn-default" onclick="cancelReview()">
                         <i class="fas fa-times"></i> Cancel
@@ -140,16 +152,29 @@
                     <h3 class="panel-title">How to Use</h3>
                 </div>
                 <div class="panel-body">
+                    <h4>Step 1: Fetch Strings</h4>
                     <ol>
                         <li>Enter your Crowdin API key (Personal Access Token)</li>
                         <li>Enter your Crowdin Project ID</li>
                         <li>Enter the File ID you want to pre-translate</li>
+                        <li>Click "Step 1: Fetch Strings from Crowdin"</li>
+                        <li>Strings with existing German translations will be shown unchecked</li>
+                    </ol>
+                    
+                    <h4>Step 2: Translate</h4>
+                    <ol>
                         <li>Enter your DeepL API key (Free tier supported)</li>
                         <li>Optionally enter a DeepL Glossary ID</li>
-                        <li>Click "Get Translations"</li>
-                        <li>Review and edit translations in the table</li>
-                        <li>Uncheck any translations you don't want to upload</li>
-                        <li>Click "Upload to Crowdin"</li>
+                        <li>Select the strings you want to translate</li>
+                        <li>Click "Step 2: Translate Selected Strings with DeepL"</li>
+                        <li>Review and edit the DeepL translations</li>
+                    </ol>
+                    
+                    <h4>Step 3: Upload</h4>
+                    <ol>
+                        <li>Review the final translations</li>
+                        <li>Uncheck any you don't want to upload</li>
+                        <li>Click "Step 3: Upload to Crowdin"</li>
                     </ol>
                     
                     <h4>Finding IDs:</h4>
@@ -167,13 +192,13 @@
                 </div>
                 <div class="panel-body">
                     <ul>
-                        <li><i class="fas fa-download"></i> Downloads file from Crowdin</li>
-                        <li><i class="fas fa-filter"></i> Filters to only untranslated strings (no German translation yet)</li>
-                        <li><i class="fas fa-language"></i> Translates with DeepL (informal voice)</li>
-                        <li><i class="fas fa-edit"></i> Review and edit translations before upload (full width)</li>
+                        <li><i class="fas fa-list"></i> <strong>Step 1:</strong> Fetch strings from Crowdin with existing translations</li>
+                        <li><i class="fas fa-filter"></i> Strings with German translations are unchecked by default</li>
+                        <li><i class="fas fa-language"></i> <strong>Step 2:</strong> Translate selected strings with DeepL (informal voice)</li>
+                        <li><i class="fas fa-edit"></i> Review and edit translations (full width table)</li>
                         <li><i class="fas fa-check-square"></i> Select which translations to upload</li>
                         <li><i class="fas fa-book"></i> Supports DeepL glossaries</li>
-                        <li><i class="fas fa-upload"></i> Uploads only selected translations</li>
+                        <li><i class="fas fa-upload"></i> <strong>Step 3:</strong> Upload selected translations to Crowdin</li>
                         <li><i class="fas fa-save"></i> Saves credentials locally in browser</li>
                     </ul>
                 </div>
@@ -188,6 +213,7 @@
 <script>
     // Global variable to store current translations
     var currentTranslations = [];
+    var currentWorkflowStep = 1; // Track which step we're on
     
     // Load saved credentials from localStorage on page load
     $(document).ready(function() {
@@ -196,6 +222,7 @@
         // Handle select all checkbox
         $('#selectAll').change(function() {
             $('.translation-checkbox').prop('checked', this.checked);
+            updateSelectionCount();
         });
     });
     
@@ -243,9 +270,16 @@
     function cancelReview() {
         $('#translationPanel').hide();
         currentTranslations = [];
+        currentWorkflowStep = 1;
     }
     
-    // Handle form submission - Step 1: Get translations
+    function updateSelectionCount() {
+        var checkedCount = $('.translation-checkbox:checked').length;
+        var totalCount = $('.translation-checkbox').length;
+        $('#selectionCount').text(checkedCount + ' of ' + totalCount + ' strings selected');
+    }
+    
+    // Handle form submission - Step 1: Fetch strings from Crowdin
     $('#pretranslateForm').submit(function(e) {
         e.preventDefault();
         
@@ -253,9 +287,9 @@
         saveCredentials();
         
         // Disable button and show loading state
-        var $btn = $('#processBtn');
+        var $btn = $('#fetchBtn');
         $btn.prop('disabled', true);
-        $btn.html('<i class="fas fa-spinner fa-spin"></i> Getting Translations...');
+        $btn.html('<i class="fas fa-spinner fa-spin"></i> Fetching Strings...');
         
         // Hide previous results
         $('#translationPanel').hide();
@@ -265,27 +299,24 @@
         var data = {
             crowdinApiKey: $('#crowdinApiKey').val(),
             projectId: $('#projectId').val(),
-            fileId: $('#fileId').val(),
-            deeplApiKey: $('#deeplApiKey').val(),
-            glossaryId: $('#glossaryId').val()
+            fileId: $('#fileId').val()
         };
         
         // Send request to backend
         $.ajax({
             type: 'POST',
-            url: '{{baseURL}}/pretranslate/translate',
+            url: '{{baseURL}}/pretranslate/fetch-strings',
             data: JSON.stringify(data),
             contentType: 'application/json',
             success: function(response) {
-                if (response.success && response.translations) {
-                    displayTranslations(response.translations);
-                } else if (response.success && response.message) {
-                    displayInfo(response.message);
+                if (response.success && response.strings) {
+                    currentWorkflowStep = 1;
+                    displayStringsForSelection(response.strings);
                 } else {
-                    displayError(response.errors || ['Unknown error occurred']);
+                    displayError(response.error || 'Failed to fetch strings');
                 }
                 $btn.prop('disabled', false);
-                $btn.html('<i class="fas fa-language"></i> Get Translations');
+                $btn.html('<i class="fas fa-download"></i> Step 1: Fetch Strings from Crowdin');
             },
             error: function(xhr, status, error) {
                 var errorMsg = 'Error: ' + error;
@@ -294,28 +325,29 @@
                 }
                 displayError([errorMsg]);
                 $btn.prop('disabled', false);
-                $btn.html('<i class="fas fa-language"></i> Get Translations');
+                $btn.html('<i class="fas fa-download"></i> Step 1: Fetch Strings from Crowdin');
             }
         });
     });
     
-    function displayTranslations(translations) {
-        currentTranslations = translations;
+    function displayStringsForSelection(strings) {
+        currentTranslations = strings;
         
         var tbody = $('#translationsBody');
         tbody.empty();
         
-        translations.forEach(function(item, index) {
+        strings.forEach(function(item, index) {
             var row = $('<tr>');
             
-            // Checkbox cell
+            // Checkbox cell - unchecked by default if hasTranslation is true
+            var isChecked = !item.hasTranslation;
             var checkboxCell = $('<td>').append(
                 $('<input>').attr({
                     type: 'checkbox',
                     class: 'translation-checkbox',
                     'data-index': index,
-                    checked: true
-                })
+                    checked: isChecked
+                }).on('change', updateSelectionCount)
             );
             
             // Source (English) cell - use div with word-wrap for better readability
@@ -327,30 +359,143 @@
                 }).text(item.source)
             );
             
-            // Translation (German) cell - editable with dynamic sizing
-            var textLength = item.translation ? item.translation.length : 0;
+            // Translation (German) cell - show existing translation or placeholder
+            var translationText = item.translation || '';
+            var textLength = translationText.length || 50;
             var numRows = Math.max(2, Math.min(10, Math.ceil(textLength / 50)));
             
             var translationCell = $('<td>').append(
                 $('<textarea>').attr({
                     class: 'form-control translation-text',
                     'data-index': index,
-                    rows: numRows
+                    rows: numRows,
+                    placeholder: item.hasTranslation ? 'Existing translation' : 'Will be translated with DeepL',
+                    readonly: currentWorkflowStep === 1
                 }).css({
                     'resize': 'vertical',
-                    'min-height': '50px'
-                }).val(item.translation)
+                    'min-height': '50px',
+                    'background-color': item.hasTranslation ? '#f0f0f0' : '#fff'
+                }).val(translationText)
             );
             
             row.append(checkboxCell, sourceCell, translationCell);
             tbody.append(row);
         });
         
+        // Update UI for Step 1
+        $('#translationPanelDescription').html('Select the strings you want to translate with DeepL. <strong>Strings with existing German translations are unchecked by default.</strong>');
+        $('#translateButtonContainer').show();
+        $('#uploadBtn').hide();
+        $('#selectAll').prop('checked', false);
+        updateSelectionCount();
+        
         $('#translationPanel').show();
         
         // Scroll to the translation panel
         $('html, body').animate({
             scrollTop: $('#translationPanel').offset().top - 100
+        }, 500);
+    }
+    
+    function translateSelectedStrings() {
+        // Collect selected strings that need translation
+        var selectedStrings = [];
+        
+        $('.translation-checkbox:checked').each(function() {
+            var index = $(this).data('index');
+            var translation = currentTranslations[index];
+            
+            selectedStrings.push({
+                key: translation.key,
+                source: translation.source,
+                stringId: translation.stringId,
+                hasTranslation: translation.hasTranslation
+            });
+        });
+        
+        if (selectedStrings.length === 0) {
+            alert('Please select at least one string to translate.');
+            return;
+        }
+        
+        // Disable button and show loading state
+        var $btn = $('#translateBtn');
+        $btn.prop('disabled', true);
+        $btn.html('<i class="fas fa-spinner fa-spin"></i> Translating with DeepL...');
+        
+        var data = {
+            deeplApiKey: $('#deeplApiKey').val(),
+            glossaryId: $('#glossaryId').val(),
+            strings: selectedStrings
+        };
+        
+        // Send request to backend
+        $.ajax({
+            type: 'POST',
+            url: '{{baseURL}}/pretranslate/translate',
+            data: JSON.stringify(data),
+            contentType: 'application/json',
+            success: function(response) {
+                if (response.success && response.strings) {
+                    currentWorkflowStep = 2;
+                    updateTranslationsWithDeepL(response.strings);
+                } else {
+                    displayError(response.error || 'Translation failed');
+                }
+                $btn.prop('disabled', false);
+                $btn.html('<i class="fas fa-language"></i> Step 2: Translate Selected Strings with DeepL');
+            },
+            error: function(xhr, status, error) {
+                var errorMsg = 'Error: ' + error;
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = 'Error: ' + xhr.responseJSON.error;
+                }
+                displayError([errorMsg]);
+                $btn.prop('disabled', false);
+                $btn.html('<i class="fas fa-language"></i> Step 2: Translate Selected Strings with DeepL');
+            }
+        });
+    }
+    
+    function updateTranslationsWithDeepL(translatedStrings) {
+        // Update the translations in currentTranslations array
+        translatedStrings.forEach(function(translatedItem) {
+            // Find the matching item in currentTranslations by stringId
+            var index = currentTranslations.findIndex(function(item) {
+                return item.stringId === translatedItem.stringId;
+            });
+            
+            if (index !== -1) {
+                currentTranslations[index].translation = translatedItem.translation;
+            }
+        });
+        
+        // Update the UI to show the translated text
+        translatedStrings.forEach(function(translatedItem) {
+            var index = currentTranslations.findIndex(function(item) {
+                return item.stringId === translatedItem.stringId;
+            });
+            
+            if (index !== -1) {
+                var $textarea = $('.translation-text[data-index="' + index + '"]');
+                $textarea.val(translatedItem.translation);
+                $textarea.prop('readonly', false);
+                $textarea.css('background-color', '#fff');
+            }
+        });
+        
+        // Update UI for Step 2 (ready to upload)
+        $('#translationPanelDescription').html('Review and edit the translations below. Click "Upload to Crowdin" to upload the selected translations.');
+        $('#translateButtonContainer').hide();
+        $('#uploadBtn').show();
+        
+        // Show success message
+        var successMsg = 'Successfully translated ' + translatedStrings.length + ' string(s) with DeepL. Review the translations and click "Upload to Crowdin" when ready.';
+        displayInfo(successMsg);
+        
+        // Scroll to the result panel
+        $('html, body').animate({
+            scrollTop: $('#resultPanel').offset().top - 100
         }, 500);
     }
     
@@ -363,12 +508,15 @@
             var translation = currentTranslations[index];
             var editedText = $('.translation-text[data-index="' + index + '"]').val();
             
-            selectedTranslations.push({
-                key: translation.key,
-                source: translation.source,
-                translation: editedText,
-                stringId: translation.stringId
-            });
+            // Only upload if there's a translation
+            if (editedText && editedText.trim() !== '') {
+                selectedTranslations.push({
+                    key: translation.key,
+                    source: translation.source,
+                    translation: editedText,
+                    stringId: translation.stringId
+                });
+            }
         });
         
         if (selectedTranslations.length === 0) {
@@ -398,11 +546,12 @@
                 if (response.success) {
                     displayUploadSuccess(response.uploaded);
                     $('#translationPanel').hide();
+                    currentWorkflowStep = 3;
                 } else {
                     displayError(response.errors || ['Upload failed']);
                 }
                 $btn.prop('disabled', false);
-                $btn.html('<i class="fas fa-upload"></i> Upload to Crowdin');
+                $btn.html('<i class="fas fa-upload"></i> Step 3: Upload to Crowdin');
             },
             error: function(xhr, status, error) {
                 var errorMsg = 'Error: ' + error;
@@ -411,7 +560,7 @@
                 }
                 displayError([errorMsg]);
                 $btn.prop('disabled', false);
-                $btn.html('<i class="fas fa-upload"></i> Upload to Crowdin');
+                $btn.html('<i class="fas fa-upload"></i> Step 3: Upload to Crowdin');
             }
         });
     }
