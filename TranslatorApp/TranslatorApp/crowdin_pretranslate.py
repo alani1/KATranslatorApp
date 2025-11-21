@@ -159,6 +159,54 @@ def crowdinUploadStringTranslations(projectId, apiKey, stringTranslations, targe
             'error': f"Exception during upload: {str(e)}"
         }
 
+def getDeeplUsage(apiKey):
+    """
+    Get DeepL API usage statistics
+    
+    Args:
+        apiKey: DeepL API key
+    
+    Returns:
+        dict: Usage information including character_count, character_limit, and remaining
+    
+    Note:
+        Currently uses the Free API endpoint. For Pro API keys, the endpoint
+        should be 'https://api.deepl.com/v2/usage' (without '-free'). 
+        Both endpoints work with their respective API keys.
+    """
+    try:
+        # Note: This uses the free API endpoint. Pro keys work on both endpoints,
+        # but for consistency with deeplTranslateStrings, we use the free endpoint.
+        url = "https://api-free.deepl.com/v2/usage"
+        headers = {
+            'Authorization': f'DeepL-Auth-Key {apiKey}'
+        }
+        
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code != 200:
+            return {
+                'success': False,
+                'error': f"DeepL API error: {response.text}"
+            }
+        
+        result = response.json()
+        character_count = result.get('character_count', 0)
+        character_limit = result.get('character_limit', 0)
+        
+        return {
+            'success': True,
+            'character_count': character_count,
+            'character_limit': character_limit,
+            'character_remaining': character_limit - character_count
+        }
+        
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f"Exception during usage fetch: {str(e)}"
+        }
+
 def deeplTranslateStrings(strings, apiKey, glossaryId=None, sourceLang='en', targetLang='de', formality='less'):
     """
     Translate strings using DeepL API
@@ -630,6 +678,39 @@ def process():
             glossaryId if glossaryId else None,
             targetLang
         )
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Exception: {str(e)}'
+        }), 500
+
+@bp.route('/deepl-usage', methods=['POST'])
+def deepl_usage():
+    """Get DeepL API usage statistics"""
+    db = connectDB()
+    user = User(db)
+    
+    if not user.isAdmin():
+        return jsonify({
+            'success': False,
+            'error': 'User does not have proper permissions'
+        }), 403
+    
+    try:
+        data = request.get_json()
+        deeplApiKey = data.get('deeplApiKey')
+        
+        if not deeplApiKey:
+            return jsonify({
+                'success': False,
+                'error': 'DeepL API key is required'
+            }), 400
+        
+        # Get usage information
+        result = getDeeplUsage(deeplApiKey)
         
         return jsonify(result)
         
