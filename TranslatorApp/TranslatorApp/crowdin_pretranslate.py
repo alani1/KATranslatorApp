@@ -40,7 +40,7 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de', 
         # Convert stringIds to a set for O(1) lookup
         # Note: We keep the original types to match what's in stringIds
         string_ids_set = set(stringIds)
-        logger.info(f"Looking for translations for {len(string_ids_set)} strings" + (f" in file {fileId}" if fileId else ""))
+        logger.info(f"Looking for translations for {len(string_ids_set)} strings{f' in file {fileId}' if fileId else ''}")
         
         # We need to check each string individually via the language translations endpoint
         # This endpoint: /projects/{projectId}/languages/{languageId}/translations
@@ -88,8 +88,9 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de', 
                 total_checked += 1
                 
                 # Only include if it's one of our strings and has a non-empty translation
-                # Use the string_id directly - types should match between APIs
-                # Strip whitespace to check if translation is actually meaningful
+                # Note: Both the strings API and translations API return integer IDs,
+                # so direct comparison should work. If there are type issues, they will
+                # be caught and logged in the calling function.
                 if string_id in string_ids_set and text and text.strip():
                     translations[string_id] = text
             
@@ -185,13 +186,14 @@ def crowdinGetStrings(projectId, fileId, apiKey, targetLang='de', limit=500):
         
         # Mark strings that already have translations
         has_translation_count = 0
-        # Log the first few IDs for debugging type issues
-        if all_strings and existing_translations:
+        # Log type information only if there might be a mismatch issue
+        if all_strings and len(existing_translations) > 0:
             first_string_id = all_strings[0]['id']
-            first_trans_id = next(iter(existing_translations.keys())) if existing_translations else None
-            logger.info(f"Type check - string ID type: {type(first_string_id)}, value: {first_string_id}")
-            if first_trans_id is not None:
-                logger.info(f"Type check - translation ID type: {type(first_trans_id)}, value: {first_trans_id}")
+            first_trans_id = next(iter(existing_translations.keys()))
+            # Only log if types don't match (potential issue)
+            if type(first_string_id) != type(first_trans_id):
+                logger.warning(f"Type mismatch detected - string ID type: {type(first_string_id).__name__}, translation ID type: {type(first_trans_id).__name__}")
+                logger.debug(f"Sample values - string ID: {first_string_id}, translation ID: {first_trans_id}")
         
         for string_obj in all_strings:
             string_obj['hasTranslation'] = string_obj['id'] in existing_translations
