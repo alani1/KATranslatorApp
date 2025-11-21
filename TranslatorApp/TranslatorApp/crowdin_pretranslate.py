@@ -40,7 +40,8 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de', 
         # Convert stringIds to a set for O(1) lookup
         # Note: We keep the original types to match what's in stringIds
         string_ids_set = set(stringIds)
-        logger.info(f"Looking for translations for {len(string_ids_set)} strings{f' in file {fileId}' if fileId else ''}")
+        file_info = f" in file {fileId}" if fileId else ""
+        logger.info(f"Looking for translations for {len(string_ids_set)} strings{file_info}")
         
         # We need to check each string individually via the language translations endpoint
         # This endpoint: /projects/{projectId}/languages/{languageId}/translations
@@ -191,7 +192,7 @@ def crowdinGetStrings(projectId, fileId, apiKey, targetLang='de', limit=500):
             first_string_id = all_strings[0]['id']
             first_trans_id = next(iter(existing_translations.keys()))
             # Only log if types don't match (potential issue)
-            if type(first_string_id) != type(first_trans_id):
+            if type(first_string_id) is not type(first_trans_id):
                 logger.warning(f"Type mismatch detected - string ID type: {type(first_string_id).__name__}, translation ID type: {type(first_trans_id).__name__}")
                 logger.debug(f"Sample values - string ID: {first_string_id}, translation ID: {first_trans_id}")
         
