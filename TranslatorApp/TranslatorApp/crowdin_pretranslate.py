@@ -180,6 +180,14 @@ def crowdinGetStrings(projectId, fileId, apiKey, targetLang='de', limit=500):
         
         # Mark strings that already have translations
         has_translation_count = 0
+        # Log the first few IDs for debugging type issues
+        if all_strings and existing_translations:
+            first_string_id = all_strings[0]['id']
+            first_trans_id = next(iter(existing_translations.keys())) if existing_translations else None
+            logger.info(f"Type check - string ID type: {type(first_string_id)}, value: {first_string_id}")
+            if first_trans_id is not None:
+                logger.info(f"Type check - translation ID type: {type(first_trans_id)}, value: {first_trans_id}")
+        
         for string_obj in all_strings:
             string_obj['hasTranslation'] = string_obj['id'] in existing_translations
             if string_obj['hasTranslation']:
@@ -711,10 +719,20 @@ def fetch_strings():
                 'hasTranslation': string_obj.get('hasTranslation', False)
             })
         
-        return jsonify({
+        # Add debug info to help diagnose issues
+        response_data = {
             'success': True,
-            'strings': string_data
-        })
+            'strings': string_data,
+            'debug': {
+                'totalStrings': len(all_strings),
+                'stringsWithTranslations': sum(1 for s in string_data if s['hasTranslation']),
+                'stringsWithoutTranslations': sum(1 for s in string_data if not s['hasTranslation'])
+            }
+        }
+        
+        logger.info(f"Returning {len(string_data)} strings to frontend: {response_data['debug']}")
+        
+        return jsonify(response_data)
         
     except Exception as e:
         return jsonify({
