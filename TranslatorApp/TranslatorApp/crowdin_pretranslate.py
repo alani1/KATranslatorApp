@@ -769,11 +769,20 @@ def translate():
                     'stringId': string_obj.get('stringId'),
                     'hasTranslation': string_obj.get('hasTranslation', False)
                 })
+            else:
+                # Log a warning if we have fewer translations than expected
+                logger.warning(f"Missing translation for string {i}: {string_obj.get('key')}")
         
-        return jsonify({
+        # If we got fewer translations than requested, include a warning
+        result = {
             'success': True,
             'strings': result_strings
-        })
+        }
+        
+        if len(translations) < len(strings):
+            result['warning'] = f"Only {len(translations)} of {len(strings)} strings were translated. Some may have been skipped by DeepL."
+        
+        return jsonify(result)
         
     except Exception as e:
         return jsonify({

@@ -440,6 +440,12 @@
                 if (response.success && response.strings) {
                     currentWorkflowStep = 2;
                     updateTranslationsWithDeepL(response.strings);
+                    
+                    // Show warning if DeepL returned fewer translations than expected
+                    if (response.warning) {
+                        console.warn(response.warning);
+                        // The success message will still be shown, warning is logged
+                    }
                 } else {
                     var errorMsg = response.error || response.errors || 'Translation failed';
                     displayError(errorMsg);
@@ -460,7 +466,7 @@
     }
     
     function updateTranslationsWithDeepL(translatedStrings) {
-        // Update the translations in currentTranslations array
+        // Update the translations in currentTranslations array and UI in a single pass
         translatedStrings.forEach(function(translatedItem) {
             // Find the matching item in currentTranslations by stringId
             var index = currentTranslations.findIndex(function(item) {
@@ -468,17 +474,10 @@
             });
             
             if (index !== -1) {
+                // Update the translation in the data array
                 currentTranslations[index].translation = translatedItem.translation;
-            }
-        });
-        
-        // Update the UI to show the translated text
-        translatedStrings.forEach(function(translatedItem) {
-            var index = currentTranslations.findIndex(function(item) {
-                return item.stringId === translatedItem.stringId;
-            });
-            
-            if (index !== -1) {
+                
+                // Update the UI
                 var $textarea = $('.translation-text[data-index="' + index + '"]');
                 $textarea.val(translatedItem.translation);
                 $textarea.prop('readonly', false);
