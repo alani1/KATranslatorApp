@@ -168,8 +168,15 @@ def getDeeplUsage(apiKey):
     
     Returns:
         dict: Usage information including character_count, character_limit, and remaining
+    
+    Note:
+        Currently uses the Free API endpoint. For Pro API keys, the endpoint
+        should be 'https://api.deepl.com/v2/usage' (without '-free'). 
+        Both endpoints work with their respective API keys.
     """
     try:
+        # Note: This uses the free API endpoint. Pro keys work on both endpoints,
+        # but for consistency with deeplTranslateStrings, we use the free endpoint.
         url = "https://api-free.deepl.com/v2/usage"
         headers = {
             'Authorization': f'DeepL-Auth-Key {apiKey}'
