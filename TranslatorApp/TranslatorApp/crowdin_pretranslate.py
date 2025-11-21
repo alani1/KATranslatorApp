@@ -37,8 +37,8 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de', 
             logger.warning("crowdinGetStringTranslations called with empty stringIds list")
             return translations
         
-        # Convert stringIds to a set for O(1) lookup
-        # Note: We keep the original types to match what's in stringIds
+        # Convert stringIds to a set for O(1) lookup performance
+        # Elements maintain their original types (int or str as returned by API)
         string_ids_set = set(stringIds)
         file_info = f" in file {fileId}" if fileId else ""
         logger.info(f"Looking for translations for {len(string_ids_set)} strings{file_info}")
@@ -63,7 +63,9 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de', 
                 'offset': offset
             }
             
-            # Add fileId filter if provided (may help reduce API response size)
+            # Add fileId filter if provided
+            # Note: Crowdin API may use this to filter translations by file, reducing response size.
+            # If not supported by the API, it will be ignored gracefully.
             if fileId:
                 params['fileId'] = fileId
             
@@ -192,7 +194,8 @@ def crowdinGetStrings(projectId, fileId, apiKey, targetLang='de', limit=500):
             first_string_id = all_strings[0]['id']
             first_trans_id = next(iter(existing_translations.keys()))
             # Only log if types don't match (potential issue)
-            if type(first_string_id) is not type(first_trans_id):
+            # Crowdin APIs should return integer IDs consistently, but we check to be safe
+            if not isinstance(first_string_id, type(first_trans_id)):
                 logger.warning(f"Type mismatch detected - string ID type: {type(first_string_id).__name__}, translation ID type: {type(first_trans_id).__name__}")
                 logger.debug(f"Sample values - string ID: {first_string_id}, translation ID: {first_trans_id}")
         
