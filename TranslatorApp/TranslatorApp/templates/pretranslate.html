@@ -65,10 +65,22 @@
                         <button type="submit" class="btn btn-primary btn-lg" id="processBtn">
                             <i class="fas fa-language"></i> Get Translations
                         </button>
+                        <button type="button" class="btn btn-info" id="checkUsageBtn" onclick="checkDeeplUsage()">
+                            <i class="fas fa-chart-bar"></i> Check DeepL Usage
+                        </button>
                         <button type="button" class="btn btn-warning" id="clearBtn" onclick="clearCredentials()">
                             <i class="fas fa-eraser"></i> Clear Saved Credentials
                         </button>
                     </form>
+                </div>
+            </div>
+            
+            <div class="panel panel-info" id="usagePanel" style="display: none;">
+                <div class="panel-heading">
+                    <h3 class="panel-title">DeepL API Usage</h3>
+                </div>
+                <div class="panel-body" id="usageBody">
+                    <!-- Usage information will be displayed here -->
                 </div>
             </div>
             
@@ -79,8 +91,8 @@
                 <div class="panel-body">
                     <p>Review and edit the translations below. Uncheck any translations you don't want to upload.</p>
                     
-                    <div style="max-height: 500px; overflow-y: auto;">
-                        <table class="table table-striped table-bordered" id="translationsTable">
+                    <div style="max-height: 70vh; overflow-y: auto;">
+                        <table class="table table-striped table-bordered" id="translationsTable" style="table-layout: fixed; width: 100%;">
                             <thead>
                                 <tr>
                                     <th style="width: 50px;">
@@ -305,15 +317,27 @@
                 })
             );
             
-            // Source (English) cell
-            var sourceCell = $('<td>').text(item.source);
+            // Source (English) cell - use div with word-wrap for better readability
+            var sourceCell = $('<td>').append(
+                $('<div>').css({
+                    'white-space': 'pre-wrap',
+                    'word-wrap': 'break-word',
+                    'max-width': '100%'
+                }).text(item.source)
+            );
             
-            // Translation (German) cell - editable
+            // Translation (German) cell - editable with dynamic sizing
+            var textLength = item.translation ? item.translation.length : 0;
+            var numRows = Math.max(2, Math.min(10, Math.ceil(textLength / 50)));
+            
             var translationCell = $('<td>').append(
                 $('<textarea>').attr({
                     class: 'form-control translation-text',
                     'data-index': index,
-                    rows: 2
+                    rows: numRows
+                }).css({
+                    'resize': 'vertical',
+                    'min-height': '50px'
                 }).val(item.translation)
             );
             
@@ -341,7 +365,8 @@
             selectedTranslations.push({
                 key: translation.key,
                 source: translation.source,
-                translation: editedText
+                translation: editedText,
+                stringId: translation.stringId
             });
         });
         
@@ -431,6 +456,130 @@
         
         $('#resultBody').html(html);
         $('#resultPanel').show();
+    }
+    
+    function checkDeeplUsage() {
+        var deeplApiKey = $('#deeplApiKey').val();
+        
+        if (!deeplApiKey) {
+            alert('Please enter your DeepL API key first.');
+            return;
+        }
+        
+        // Disable button and show loading state
+        var $btn = $('#checkUsageBtn');
+        $btn.prop('disabled', true);
+        $btn.html('<i class="fas fa-spinner fa-spin"></i> Checking...');
+        
+        var data = {
+            deeplApiKey: deeplApiKey
+        };
+        
+        // Send request to backend
+        $.ajax({
+            type: 'POST',
+            url: '{{baseURL}}/pretranslate/deepl-usage',
+            data: JSON.stringify(data),
+            contentType: 'application/json',
+            success: function(response) {
+                if (response.success) {
+                    displayUsage(response);
+                } else {
+                    displayUsageError(response.error || 'Failed to fetch usage information');
+                }
+                $btn.prop('disabled', false);
+                $btn.html('<i class="fas fa-chart-bar"></i> Check DeepL Usage');
+            },
+            error: function(xhr, status, error) {
+                var errorMsg = 'Error: ' + error;
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = 'Error: ' + xhr.responseJSON.error;
+                }
+                displayUsageError(errorMsg);
+                $btn.prop('disabled', false);
+                $btn.html('<i class="fas fa-chart-bar"></i> Check DeepL Usage');
+            }
+        });
+    }
+    
+    function displayUsage(usage) {
+        var characterCount = usage.character_count || 0;
+        var characterLimit = usage.character_limit || 0;
+        var characterRemaining = usage.character_remaining || 0;
+        
+        var percentUsed = characterLimit > 0 ? Math.round((characterCount / characterLimit) * 100) : 0;
+        
+        var progressBarClass = 'progress-bar-success';
+        if (percentUsed > 80) {
+            progressBarClass = 'progress-bar-danger';
+        } else if (percentUsed > 50) {
+            progressBarClass = 'progress-bar-warning';
+        }
+        
+        var html = '<div class="row">';
+        html += '<div class="col-md-12">';
+        html += '<h4><i class="fas fa-info-circle"></i> Current Usage</h4>';
+        html += '<div class="progress" style="height: 30px; margin-bottom: 15px;">';
+        html += '<div class="progress-bar ' + progressBarClass + '" role="progressbar" ';
+        html += 'aria-valuenow="' + percentUsed + '" aria-valuemin="0" aria-valuemax="100" ';
+        html += 'style="width: ' + percentUsed + '%; line-height: 30px; font-size: 14px;">';
+        html += percentUsed + '%';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+        
+        html += '<div class="row">';
+        html += '<div class="col-md-4">';
+        html += '<div class="panel panel-info">';
+        html += '<div class="panel-body text-center">';
+        html += '<h3>' + characterCount.toLocaleString() + '</h3>';
+        html += '<p>Characters Used</p>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+        
+        html += '<div class="col-md-4">';
+        html += '<div class="panel panel-success">';
+        html += '<div class="panel-body text-center">';
+        html += '<h3>' + characterRemaining.toLocaleString() + '</h3>';
+        html += '<p>Characters Remaining</p>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+        
+        html += '<div class="col-md-4">';
+        html += '<div class="panel panel-primary">';
+        html += '<div class="panel-body text-center">';
+        html += '<h3>' + characterLimit.toLocaleString() + '</h3>';
+        html += '<p>Total Limit</p>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+        
+        html += '<div class="alert alert-info">';
+        html += '<p><strong>Note:</strong> DeepL Free API quotas typically reset monthly. ';
+        html += 'If you\'re using the paid API (DeepL Pro), check your account settings for renewal dates.</p>';
+        html += '</div>';
+        
+        $('#usageBody').html(html);
+        $('#usagePanel').show();
+        
+        // Scroll to the usage panel
+        $('html, body').animate({
+            scrollTop: $('#usagePanel').offset().top - 100
+        }, 500);
+    }
+    
+    function displayUsageError(errorMsg) {
+        var html = '<div class="alert alert-danger">';
+        html += '<h4><i class="fas fa-exclamation-triangle"></i> Error</h4>';
+        html += '<p>' + errorMsg + '</p>';
+        html += '</div>';
+        
+        $('#usageBody').html(html);
+        $('#usagePanel').show();
     }
 </script>
 {% endblock %}
