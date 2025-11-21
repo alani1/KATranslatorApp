@@ -9,7 +9,7 @@
     <div class="row">
         <div class="col-md-8">
             <h3>Pre-Translate Crowdin File with DeepL</h3>
-            <p>This tool downloads a file from Crowdin, translates all untranslated strings using DeepL API with informal voice, allows you to review and edit the translations, and then uploads only the selected translations back to Crowdin.</p>
+            <p>This tool downloads a file from Crowdin, identifies strings without German translations, translates them using DeepL API with informal voice, allows you to review and edit the translations, and then uploads only the selected translations back to Crowdin.</p>
             
             {% if user.isAdmin() %}
             <div class="panel panel-primary">
@@ -84,11 +84,11 @@
                 </div>
             </div>
             
-            <div class="panel panel-success" id="translationPanel" style="display: none;">
+            <div class="panel panel-success" id="translationPanel" style="display: none; position: relative; left: 50%; right: 50%; margin-left: -50vw; margin-right: -50vw; width: 100vw;">
                 <div class="panel-heading">
                     <h3 class="panel-title">Review Translations</h3>
                 </div>
-                <div class="panel-body">
+                <div class="panel-body" style="padding-left: 15px; padding-right: 15px;">
                     <p>Review and edit the translations below. Uncheck any translations you don't want to upload.</p>
                     
                     <div style="max-height: 70vh; overflow-y: auto;">
@@ -168,8 +168,9 @@
                 <div class="panel-body">
                     <ul>
                         <li><i class="fas fa-download"></i> Downloads file from Crowdin</li>
+                        <li><i class="fas fa-filter"></i> Filters to only untranslated strings (no German translation yet)</li>
                         <li><i class="fas fa-language"></i> Translates with DeepL (informal voice)</li>
-                        <li><i class="fas fa-edit"></i> Review and edit translations before upload</li>
+                        <li><i class="fas fa-edit"></i> Review and edit translations before upload (full width)</li>
                         <li><i class="fas fa-check-square"></i> Select which translations to upload</li>
                         <li><i class="fas fa-book"></i> Supports DeepL glossaries</li>
                         <li><i class="fas fa-upload"></i> Uploads only selected translations</li>
