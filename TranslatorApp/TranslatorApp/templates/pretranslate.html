@@ -84,14 +84,14 @@
                 </div>
             </div>
             
-            <div class="panel panel-success" id="translationPanel" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; background: white; overflow-y: auto;">
+            <div class="panel panel-success" id="translationPanel" style="display: none; position: relative; left: 50%; right: 50%; margin-left: -50vw; margin-right: -50vw; width: 100vw;">
                 <div class="panel-heading">
-                    <h3 class="panel-title">Review Translations (Full Screen)</h3>
+                    <h3 class="panel-title">Review Translations</h3>
                 </div>
-                <div class="panel-body" style="padding: 20px;">
+                <div class="panel-body" style="padding-left: 15px; padding-right: 15px;">
                     <p>Review and edit the translations below. Uncheck any translations you don't want to upload.</p>
                     
-                    <div style="max-height: calc(100vh - 250px); overflow-y: auto;">
+                    <div style="max-height: 70vh; overflow-y: auto;">
                         <table class="table table-striped table-bordered" id="translationsTable" style="table-layout: fixed; width: 100%;">
                             <thead>
                                 <tr>
@@ -170,7 +170,7 @@
                         <li><i class="fas fa-download"></i> Downloads file from Crowdin</li>
                         <li><i class="fas fa-filter"></i> Filters to only untranslated strings (no German translation yet)</li>
                         <li><i class="fas fa-language"></i> Translates with DeepL (informal voice)</li>
-                        <li><i class="fas fa-edit"></i> Review and edit translations before upload (full screen)</li>
+                        <li><i class="fas fa-edit"></i> Review and edit translations before upload (full width)</li>
                         <li><i class="fas fa-check-square"></i> Select which translations to upload</li>
                         <li><i class="fas fa-book"></i> Supports DeepL glossaries</li>
                         <li><i class="fas fa-upload"></i> Uploads only selected translations</li>
@@ -348,7 +348,10 @@
         
         $('#translationPanel').show();
         
-        // No need to scroll - panel is now full screen
+        // Scroll to the translation panel
+        $('html, body').animate({
+            scrollTop: $('#translationPanel').offset().top - 100
+        }, 500);
     }
     
     function uploadTranslations() {
