@@ -10,19 +10,92 @@ import requests
 import json
 from TranslatorApp.user import User
 
-def crowdinGetStrings(projectId, fileId, apiKey, limit=500):
+def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
+    """
+    Fetch existing translations for specific strings in a target language
+    
+    Args:
+        projectId: Crowdin project ID
+        stringIds: List of string IDs to check for translations
+        apiKey: Crowdin API key
+        targetLang: Target language code (default: 'de' for German)
+    
+    Returns:
+        dict: Maps stringId -> translation text (only includes strings with translations)
+    """
+    try:
+        translations = {}
+        
+        # We need to check each string individually via the language translations endpoint
+        # This endpoint: /projects/{projectId}/languages/{languageId}/translations
+        url = f"https://api.crowdin.com/api/v2/projects/{projectId}/languages/{targetLang}/translations"
+        headers = {
+            'Authorization': f'Bearer {apiKey}',
+            'Content-Type': 'application/json'
+        }
+        
+        # Fetch all translations for the target language
+        # Then filter by our string IDs
+        offset = 0
+        limit = 500
+        
+        while True:
+            params = {
+                'limit': limit,
+                'offset': offset
+            }
+            
+            response = requests.get(url, headers=headers, params=params)
+            
+            if response.status_code != 200:
+                # If we can't fetch translations, return empty dict (no translations found)
+                # This is not a critical error - we'll just translate all strings
+                return translations
+            
+            result = response.json()
+            data_items = result.get('data', [])
+            
+            if not data_items:
+                break
+            
+            # Extract translations for our string IDs
+            for item in data_items:
+                trans_data = item.get('data', {})
+                string_id = trans_data.get('stringId')
+                text = trans_data.get('text', '')
+                
+                # Only include if it's one of our strings and has a translation
+                if string_id in stringIds and text:
+                    translations[string_id] = text
+            
+            # Check if there are more pages
+            pagination = result.get('pagination', {})
+            if offset + limit >= pagination.get('total', 0):
+                break
+            
+            offset += limit
+        
+        return translations
+        
+    except Exception as e:
+        # Return empty dict on error - we'll translate all strings
+        return {}
+
+def crowdinGetStrings(projectId, fileId, apiKey, targetLang='de', limit=500):
     """
     Fetch strings from a Crowdin file using the string-level API
+    and check which ones already have translations in the target language
     (accessible to Translator and Proofreader roles)
     
     Args:
         projectId: Crowdin project ID
         fileId: Crowdin file ID
         apiKey: Crowdin API key
+        targetLang: Target language code to check for existing translations (default: 'de')
         limit: Maximum number of strings to fetch per request (default: 500)
     
     Returns:
-        dict: Contains 'success', 'strings' (list of string objects), 
+        dict: Contains 'success', 'strings' (list of string objects with hasTranslation flag), 
               and 'virtual_content' (JSON mapping identifier->text)
     """
     try:
@@ -76,6 +149,16 @@ def crowdinGetStrings(projectId, fileId, apiKey, limit=500):
                 break
             
             offset += limit
+        
+        # Now fetch existing translations for these strings
+        string_ids = [s['id'] for s in all_strings]
+        existing_translations = crowdinGetStringTranslations(projectId, string_ids, apiKey, targetLang)
+        
+        # Mark strings that already have translations
+        for string_obj in all_strings:
+            string_obj['hasTranslation'] = string_obj['id'] in existing_translations
+            if string_obj['hasTranslation']:
+                string_obj['existingTranslation'] = existing_translations[string_obj['id']]
         
         # Build virtual file content (identifier -> text mapping)
         virtual_content = {}
@@ -273,6 +356,7 @@ def getTranslationsForReview(projectId, fileId, crowdinApiKey, deeplApiKey, glos
     """
     Fetch strings, translate, and return translations for user review
     Does NOT upload to Crowdin yet
+    Only processes strings that don't have existing German translations
     
     Args:
         projectId: Crowdin project ID
@@ -291,28 +375,31 @@ def getTranslationsForReview(projectId, fileId, crowdinApiKey, deeplApiKey, glos
     }
     
     # Step 1: Fetch strings from Crowdin using string-level API
-    strings_result = crowdinGetStrings(projectId, fileId, crowdinApiKey)
+    # This now includes checking for existing German translations
+    strings_result = crowdinGetStrings(projectId, fileId, crowdinApiKey, targetLang='de')
     if not strings_result['success']:
         result['errors'].append(strings_result['error'])
         return result
     
     all_strings = strings_result['strings']
     
-    # Step 2: Identify untranslated strings (for now, treat all as needing translation)
+    # Step 2: Filter to only untranslated strings (those without existing German translations)
     untranslated_strings = []
     string_mapping = []  # To track stringId, identifier, and source text
     
     for string_obj in all_strings:
-        untranslated_strings.append(string_obj['text'])
-        string_mapping.append({
-            'stringId': string_obj['id'],
-            'identifier': string_obj['identifier'],
-            'source': string_obj['text']
-        })
+        # Only include strings that don't have a German translation yet
+        if not string_obj.get('hasTranslation', False):
+            untranslated_strings.append(string_obj['text'])
+            string_mapping.append({
+                'stringId': string_obj['id'],
+                'identifier': string_obj['identifier'],
+                'source': string_obj['text']
+            })
     
     if not untranslated_strings:
         result['success'] = True
-        result['message'] = "No untranslated strings found"
+        result['message'] = "No untranslated strings found - all strings already have German translations"
         return result
     
     # Step 3: Translate via DeepL with informal formality
@@ -418,7 +505,7 @@ def processPreTranslation(projectId, fileId, crowdinApiKey, deeplApiKey, glossar
     """
     Main function to process pre-translation:
     1. Fetch strings from Crowdin
-    2. Identify untranslated strings
+    2. Identify untranslated strings (filter out those with existing translations)
     3. Translate via DeepL
     4. Upload back to Crowdin using string-level API
     
@@ -443,7 +530,8 @@ def processPreTranslation(projectId, fileId, crowdinApiKey, deeplApiKey, glossar
     }
     
     # Step 1: Fetch strings from Crowdin using string-level API
-    strings_result = crowdinGetStrings(projectId, fileId, crowdinApiKey)
+    # This now checks for existing translations in the target language
+    strings_result = crowdinGetStrings(projectId, fileId, crowdinApiKey, targetLang=targetLang)
     if not strings_result['success']:
         result['errors'].append(strings_result['error'])
         return result
@@ -451,22 +539,24 @@ def processPreTranslation(projectId, fileId, crowdinApiKey, deeplApiKey, glossar
     result['downloaded'] = 1
     all_strings = strings_result['strings']
     
-    # Step 2: Identify untranslated strings (treat all as needing translation)
+    # Step 2: Filter to only untranslated strings (those without existing translations)
     untranslated_strings = []
     string_translations = []  # To track stringId and text for upload
     
     for string_obj in all_strings:
-        untranslated_strings.append(string_obj['text'])
-        string_translations.append({
-            'stringId': string_obj['id'],
-            'source': string_obj['text']
-        })
+        # Only include strings that don't have a translation yet
+        if not string_obj.get('hasTranslation', False):
+            untranslated_strings.append(string_obj['text'])
+            string_translations.append({
+                'stringId': string_obj['id'],
+                'source': string_obj['text']
+            })
     
     result['untranslated'] = len(untranslated_strings)
     
     if not untranslated_strings:
         result['success'] = True
-        result['message'] = "No untranslated strings found"
+        result['message'] = "No untranslated strings found - all strings already have translations"
         return result
     
     # Step 3: Translate via DeepL (with configurable targetLang)
