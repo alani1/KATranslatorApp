@@ -111,7 +111,7 @@ def crowdinUploadStringTranslations(projectId, apiKey, stringTranslations, targe
         dict: Upload result with success status and count
     """
     try:
-        url = f"https://api.crowdin.com/api/v2/projects/{projectId}/translations/{targetLang}"
+        url = f"https://api.crowdin.com/api/v2/projects/{projectId}/translations"
         headers = {
             'Authorization': f'Bearer {apiKey}',
             'Content-Type': 'application/json'
@@ -130,10 +130,9 @@ def crowdinUploadStringTranslations(projectId, apiKey, stringTranslations, targe
                 continue
             
             payload = {
-                'translations': [{
-                    'stringId': string_id,
-                    'text': translation_text
-                }]
+                'stringId': string_id,
+                'text': translation_text,
+                'languageId': targetLang
             }
             
             response = requests.post(url, headers=headers, json=payload)
