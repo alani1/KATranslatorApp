@@ -642,9 +642,9 @@ def pretranslate():
         baseURL=Configuration.baseURL,
     ))
 
-@bp.route('/translate', methods=['POST'])
-def translate():
-    """Get translations for review (Step 1)"""
+@bp.route('/fetch-strings', methods=['POST'])
+def fetch_strings():
+    """Fetch strings from Crowdin with existing translations (Step 1)"""
     db = connectDB()
     user = User(db)
     
@@ -660,24 +660,127 @@ def translate():
         projectId = data.get('projectId')
         fileId = data.get('fileId')
         crowdinApiKey = data.get('crowdinApiKey')
-        deeplApiKey = data.get('deeplApiKey')
-        glossaryId = data.get('glossaryId')
         
         # Validate required parameters
-        if not all([projectId, fileId, crowdinApiKey, deeplApiKey]):
+        if not all([projectId, fileId, crowdinApiKey]):
             return jsonify({
                 'success': False,
                 'error': 'Missing required parameters'
             }), 400
         
-        # Get translations for review
-        result = getTranslationsForReview(
-            projectId,
-            fileId,
-            crowdinApiKey,
+        # Fetch strings from Crowdin with existing translations
+        strings_result = crowdinGetStrings(projectId, fileId, crowdinApiKey, targetLang='de')
+        
+        if not strings_result['success']:
+            return jsonify({
+                'success': False,
+                'error': strings_result['error']
+            }), 500
+        
+        all_strings = strings_result['strings']
+        
+        # Prepare string data for display
+        string_data = []
+        for string_obj in all_strings:
+            string_data.append({
+                'key': string_obj['identifier'],
+                'source': string_obj['text'],
+                'translation': string_obj.get('existingTranslation', ''),
+                'stringId': string_obj['id'],
+                'hasTranslation': string_obj.get('hasTranslation', False)
+            })
+        
+        return jsonify({
+            'success': True,
+            'strings': string_data
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Exception: {str(e)}'
+        }), 500
+
+@bp.route('/translate', methods=['POST'])
+def translate():
+    """Translate selected strings with DeepL (Step 2)"""
+    db = connectDB()
+    user = User(db)
+    
+    if not user.isAdmin():
+        return jsonify({
+            'success': False,
+            'error': 'User does not have proper permissions'
+        }), 403
+    
+    try:
+        data = request.get_json()
+        
+        deeplApiKey = data.get('deeplApiKey')
+        glossaryId = data.get('glossaryId')
+        strings = data.get('strings', [])
+        
+        # Validate required parameters
+        if not deeplApiKey:
+            return jsonify({
+                'success': False,
+                'error': 'Missing DeepL API key'
+            }), 400
+        
+        if not strings:
+            return jsonify({
+                'success': False,
+                'error': 'No strings to translate'
+            }), 400
+        
+        # Extract source texts from strings
+        source_texts = [s.get('source', '') for s in strings if s.get('source')]
+        
+        if not source_texts:
+            return jsonify({
+                'success': False,
+                'error': 'No valid source texts found'
+            }), 400
+        
+        # Translate via DeepL
+        translation_result = deeplTranslateStrings(
+            source_texts,
             deeplApiKey,
-            glossaryId if glossaryId else None
+            glossaryId=glossaryId if glossaryId else None,
+            formality='less'
         )
+        
+        if not translation_result['success']:
+            return jsonify({
+                'success': False,
+                'error': translation_result['error']
+            }), 500
+        
+        # Combine translations with original string data
+        translations = translation_result['translations']
+        result_strings = []
+        
+        for i, string_obj in enumerate(strings):
+            if i < len(translations):
+                result_strings.append({
+                    'key': string_obj.get('key'),
+                    'source': string_obj.get('source'),
+                    'translation': translations[i],
+                    'stringId': string_obj.get('stringId'),
+                    'hasTranslation': string_obj.get('hasTranslation', False)
+                })
+            else:
+                # Log a warning if we have fewer translations than expected
+                logger.warning(f"Missing translation for string {i}: {string_obj.get('key')}")
+        
+        # If we got fewer translations than requested, include a warning
+        result = {
+            'success': True,
+            'strings': result_strings
+        }
+        
+        if len(translations) < len(strings):
+            result['warning'] = f"Only {len(translations)} of {len(strings)} strings were translated. Some may have been skipped by DeepL."
         
         return jsonify(result)
         
