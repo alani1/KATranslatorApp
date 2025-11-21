@@ -8,7 +8,11 @@ from flask import (
 import pymysql
 import requests
 import json
+import logging
 from TranslatorApp.user import User
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
     """
@@ -21,7 +25,8 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
         targetLang: Target language code (default: 'de' for German)
     
     Returns:
-        dict: Maps stringId -> translation text (only includes strings with translations)
+        dict: Maps stringId -> translation text. Only includes strings that have 
+              non-empty translations; strings without translations are excluded.
     """
     try:
         translations = {}
@@ -48,8 +53,8 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
             response = requests.get(url, headers=headers, params=params)
             
             if response.status_code != 200:
-                # If we can't fetch translations, return empty dict (no translations found)
-                # This is not a critical error - we'll just translate all strings
+                # If we can't fetch translations (API error or no access), return empty dict
+                # This allows graceful degradation - we'll just translate all strings
                 return translations
             
             result = response.json()
@@ -78,7 +83,9 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
         return translations
         
     except Exception as e:
-        # Return empty dict on error - we'll translate all strings
+        # Log error but return empty dict for graceful degradation
+        # This allows the translation process to continue with all strings
+        logger.warning(f"Error fetching existing translations: {str(e)}")
         return {}
 
 def crowdinGetStrings(projectId, fileId, apiKey, targetLang='de', limit=500):
