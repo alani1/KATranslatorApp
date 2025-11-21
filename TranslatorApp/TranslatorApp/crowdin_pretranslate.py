@@ -31,6 +31,16 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
     try:
         translations = {}
         
+        # Validate input
+        if not stringIds:
+            logger.warning("crowdinGetStringTranslations called with empty stringIds list")
+            return translations
+        
+        # Convert stringIds to a set for O(1) lookup
+        # Note: We keep the original types to match what's in stringIds
+        string_ids_set = set(stringIds)
+        logger.info(f"Looking for translations for {len(string_ids_set)} strings")
+        
         # We need to check each string individually via the language translations endpoint
         # This endpoint: /projects/{projectId}/languages/{languageId}/translations
         url = f"https://api.crowdin.com/api/v2/projects/{projectId}/languages/{targetLang}/translations"
@@ -43,6 +53,7 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
         # Then filter by our string IDs
         offset = 0
         limit = 500
+        total_checked = 0
         
         while True:
             params = {
@@ -55,6 +66,7 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
             if response.status_code != 200:
                 # If we can't fetch translations (API error or no access), return empty dict
                 # This allows graceful degradation - we'll just translate all strings
+                logger.warning(f"Failed to fetch translations: HTTP {response.status_code}")
                 return translations
             
             result = response.json()
@@ -68,9 +80,12 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
                 trans_data = item.get('data', {})
                 string_id = trans_data.get('stringId')
                 text = trans_data.get('text', '')
+                total_checked += 1
                 
-                # Only include if it's one of our strings and has a translation
-                if string_id in stringIds and text:
+                # Only include if it's one of our strings and has a non-empty translation
+                # Use the string_id directly - types should match between APIs
+                # Strip whitespace to check if translation is actually meaningful
+                if string_id in string_ids_set and text and text.strip():
                     translations[string_id] = text
             
             # Check if there are more pages
@@ -80,6 +95,7 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
             
             offset += limit
         
+        logger.info(f"Checked {total_checked} total translations, found {len(translations)} matching our strings")
         return translations
         
     except Exception as e:
@@ -159,13 +175,18 @@ def crowdinGetStrings(projectId, fileId, apiKey, targetLang='de', limit=500):
         
         # Now fetch existing translations for these strings
         string_ids = [s['id'] for s in all_strings]
+        logger.info(f"Fetched {len(all_strings)} strings from file, checking for existing translations")
         existing_translations = crowdinGetStringTranslations(projectId, string_ids, apiKey, targetLang)
         
         # Mark strings that already have translations
+        has_translation_count = 0
         for string_obj in all_strings:
             string_obj['hasTranslation'] = string_obj['id'] in existing_translations
             if string_obj['hasTranslation']:
                 string_obj['existingTranslation'] = existing_translations[string_obj['id']]
+                has_translation_count += 1
+        
+        logger.info(f"{has_translation_count} out of {len(all_strings)} strings have existing translations")
         
         # Build virtual file content (identifier -> text mapping)
         virtual_content = {}
