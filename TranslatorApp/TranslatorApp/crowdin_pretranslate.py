@@ -129,10 +129,12 @@ def crowdinUploadStringTranslations(projectId, apiKey, stringTranslations, targe
                 errors.append(f"Missing stringId or text in translation item: {item}")
                 continue
             
-            payload = [{
-                'stringId': string_id,
-                'text': translation_text
-            }]
+            payload = {
+                'translations': [{
+                    'stringId': string_id,
+                    'text': translation_text
+                }]
+            }
             
             response = requests.post(url, headers=headers, json=payload)
             
