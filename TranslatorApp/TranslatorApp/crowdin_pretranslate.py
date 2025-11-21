@@ -14,7 +14,7 @@ from TranslatorApp.user import User
 # Configure logging
 logger = logging.getLogger(__name__)
 
-def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
+def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de', fileId=None):
     """
     Fetch existing translations for specific strings in a target language
     
@@ -23,6 +23,7 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
         stringIds: List of string IDs to check for translations
         apiKey: Crowdin API key
         targetLang: Target language code (default: 'de' for German)
+        fileId: Optional file ID to filter translations (if supported by API)
     
     Returns:
         dict: Maps stringId -> translation text. Only includes strings that have 
@@ -39,7 +40,7 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
         # Convert stringIds to a set for O(1) lookup
         # Note: We keep the original types to match what's in stringIds
         string_ids_set = set(stringIds)
-        logger.info(f"Looking for translations for {len(string_ids_set)} strings")
+        logger.info(f"Looking for translations for {len(string_ids_set)} strings" + (f" in file {fileId}" if fileId else ""))
         
         # We need to check each string individually via the language translations endpoint
         # This endpoint: /projects/{projectId}/languages/{languageId}/translations
@@ -60,6 +61,10 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
                 'limit': limit,
                 'offset': offset
             }
+            
+            # Add fileId filter if provided (may help reduce API response size)
+            if fileId:
+                params['fileId'] = fileId
             
             response = requests.get(url, headers=headers, params=params)
             
@@ -176,7 +181,7 @@ def crowdinGetStrings(projectId, fileId, apiKey, targetLang='de', limit=500):
         # Now fetch existing translations for these strings
         string_ids = [s['id'] for s in all_strings]
         logger.info(f"Fetched {len(all_strings)} strings from file, checking for existing translations")
-        existing_translations = crowdinGetStringTranslations(projectId, string_ids, apiKey, targetLang)
+        existing_translations = crowdinGetStringTranslations(projectId, string_ids, apiKey, targetLang, fileId)
         
         # Mark strings that already have translations
         has_translation_count = 0
