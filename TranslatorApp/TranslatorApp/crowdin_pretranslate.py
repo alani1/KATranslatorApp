@@ -14,6 +14,41 @@ from TranslatorApp.user import User
 # Configure logging
 logger = logging.getLogger(__name__)
 
+def isUrlOnly(text):
+    """
+    Check if a string contains only a URL (with optional whitespace)
+    
+    Args:
+        text: String to check
+    
+    Returns:
+        bool: True if the string contains only a URL, False otherwise
+    
+    Examples:
+        >>> isUrlOnly("https://example.com/image.png")
+        True
+        >>> isUrlOnly("  https://example.com/image.png  ")
+        True
+        >>> isUrlOnly("Check out https://example.com")
+        False
+        >>> isUrlOnly("https://example.com image description")
+        False
+    """
+    import re
+    
+    if not text or not isinstance(text, str):
+        return False
+    
+    # Strip whitespace
+    text = text.strip()
+    
+    # Check if the entire string is a URL
+    # URL pattern that matches http://, https://, ftp://, or www.
+    # This pattern is intentionally simple to catch common URL formats
+    url_pattern = r'^(https?://|ftp://|www\.)[^\s]+$'
+    
+    return bool(re.match(url_pattern, text, re.IGNORECASE))
+
 def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de', fileId=None):
     """
     Fetch existing translations for specific strings in a target language
@@ -182,9 +217,17 @@ def crowdinGetStrings(projectId, fileId, apiKey, targetLang='de', limit=500):
             
             offset += limit
         
+        # Filter out strings that contain only a URL
+        original_count = len(all_strings)
+        all_strings = [s for s in all_strings if not isUrlOnly(s['text'])]
+        filtered_count = original_count - len(all_strings)
+        
+        if filtered_count > 0:
+            logger.info(f"Filtered out {filtered_count} URL-only strings (images/resources that don't need translation)")
+        
         # Now fetch existing translations for these strings
         string_ids = [s['id'] for s in all_strings]
-        logger.info(f"Fetched {len(all_strings)} strings from file, checking for existing translations")
+        logger.info(f"Fetched {len(all_strings)} strings from file (after filtering), checking for existing translations")
         existing_translations = crowdinGetStringTranslations(projectId, string_ids, apiKey, targetLang, fileId)
         
         # Mark strings that already have translations
