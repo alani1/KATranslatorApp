@@ -313,7 +313,8 @@
                     currentWorkflowStep = 1;
                     displayStringsForSelection(response.strings);
                 } else {
-                    displayError(response.error || 'Failed to fetch strings');
+                    var errorMsg = response.error || response.errors || 'Failed to fetch strings';
+                    displayError(errorMsg);
                 }
                 $btn.prop('disabled', false);
                 $btn.html('<i class="fas fa-download"></i> Step 1: Fetch Strings from Crowdin');
@@ -440,7 +441,8 @@
                     currentWorkflowStep = 2;
                     updateTranslationsWithDeepL(response.strings);
                 } else {
-                    displayError(response.error || 'Translation failed');
+                    var errorMsg = response.error || response.errors || 'Translation failed';
+                    displayError(errorMsg);
                 }
                 $btn.prop('disabled', false);
                 $btn.html('<i class="fas fa-language"></i> Step 2: Translate Selected Strings with DeepL');
@@ -548,7 +550,8 @@
                     $('#translationPanel').hide();
                     currentWorkflowStep = 3;
                 } else {
-                    displayError(response.errors || ['Upload failed']);
+                    var errorMsg = response.error || response.errors || 'Upload failed';
+                    displayError(errorMsg);
                 }
                 $btn.prop('disabled', false);
                 $btn.html('<i class="fas fa-upload"></i> Step 3: Upload to Crowdin');
