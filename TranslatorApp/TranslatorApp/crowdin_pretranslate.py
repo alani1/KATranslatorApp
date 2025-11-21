@@ -14,7 +14,7 @@ from TranslatorApp.user import User
 # Configure logging
 logger = logging.getLogger(__name__)
 
-def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
+def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de', fileId=None):
     """
     Fetch existing translations for specific strings in a target language
     
@@ -23,6 +23,7 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
         stringIds: List of string IDs to check for translations
         apiKey: Crowdin API key
         targetLang: Target language code (default: 'de' for German)
+        fileId: Optional file ID to filter translations (if supported by API)
     
     Returns:
         dict: Maps stringId -> translation text. Only includes strings that have 
@@ -30,6 +31,17 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
     """
     try:
         translations = {}
+        
+        # Validate input
+        if not stringIds:
+            logger.warning("crowdinGetStringTranslations called with empty stringIds list")
+            return translations
+        
+        # Convert stringIds to a set for O(1) lookup performance
+        # Elements maintain their original types (int or str as returned by API)
+        string_ids_set = set(stringIds)
+        file_info = f" in file {fileId}" if fileId else ""
+        logger.info(f"Looking for translations for {len(string_ids_set)} strings{file_info}")
         
         # We need to check each string individually via the language translations endpoint
         # This endpoint: /projects/{projectId}/languages/{languageId}/translations
@@ -43,6 +55,7 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
         # Then filter by our string IDs
         offset = 0
         limit = 500
+        total_checked = 0
         
         while True:
             params = {
@@ -50,11 +63,18 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
                 'offset': offset
             }
             
+            # Add fileId filter if provided
+            # Note: Crowdin API may use this to filter translations by file, reducing response size.
+            # If not supported by the API, it will be ignored gracefully.
+            if fileId:
+                params['fileId'] = fileId
+            
             response = requests.get(url, headers=headers, params=params)
             
             if response.status_code != 200:
                 # If we can't fetch translations (API error or no access), return empty dict
                 # This allows graceful degradation - we'll just translate all strings
+                logger.warning(f"Failed to fetch translations: HTTP {response.status_code}")
                 return translations
             
             result = response.json()
@@ -68,9 +88,13 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
                 trans_data = item.get('data', {})
                 string_id = trans_data.get('stringId')
                 text = trans_data.get('text', '')
+                total_checked += 1
                 
-                # Only include if it's one of our strings and has a translation
-                if string_id in stringIds and text:
+                # Only include if it's one of our strings and has a non-empty translation
+                # Note: Both the strings API and translations API return integer IDs,
+                # so direct comparison should work. If there are type issues, they will
+                # be caught and logged in the calling function.
+                if string_id in string_ids_set and text and text.strip():
                     translations[string_id] = text
             
             # Check if there are more pages
@@ -80,6 +104,7 @@ def crowdinGetStringTranslations(projectId, stringIds, apiKey, targetLang='de'):
             
             offset += limit
         
+        logger.info(f"Checked {total_checked} total translations, found {len(translations)} matching our strings")
         return translations
         
     except Exception as e:
@@ -159,13 +184,28 @@ def crowdinGetStrings(projectId, fileId, apiKey, targetLang='de', limit=500):
         
         # Now fetch existing translations for these strings
         string_ids = [s['id'] for s in all_strings]
-        existing_translations = crowdinGetStringTranslations(projectId, string_ids, apiKey, targetLang)
+        logger.info(f"Fetched {len(all_strings)} strings from file, checking for existing translations")
+        existing_translations = crowdinGetStringTranslations(projectId, string_ids, apiKey, targetLang, fileId)
         
         # Mark strings that already have translations
+        has_translation_count = 0
+        # Log type information only if there might be a mismatch issue
+        if all_strings and len(existing_translations) > 0:
+            first_string_id = all_strings[0]['id']
+            first_trans_id = next(iter(existing_translations.keys()))
+            # Only log if types don't match (potential issue)
+            # Crowdin APIs should return integer IDs consistently, but we check to be safe
+            if not isinstance(first_string_id, type(first_trans_id)):
+                logger.warning(f"Type mismatch detected - string ID type: {type(first_string_id).__name__}, translation ID type: {type(first_trans_id).__name__}")
+                logger.debug(f"Sample values - string ID: {first_string_id}, translation ID: {first_trans_id}")
+        
         for string_obj in all_strings:
             string_obj['hasTranslation'] = string_obj['id'] in existing_translations
             if string_obj['hasTranslation']:
                 string_obj['existingTranslation'] = existing_translations[string_obj['id']]
+                has_translation_count += 1
+        
+        logger.info(f"{has_translation_count} out of {len(all_strings)} strings have existing translations")
         
         # Build virtual file content (identifier -> text mapping)
         virtual_content = {}
@@ -690,10 +730,20 @@ def fetch_strings():
                 'hasTranslation': string_obj.get('hasTranslation', False)
             })
         
-        return jsonify({
+        # Add debug info to help diagnose issues
+        response_data = {
             'success': True,
-            'strings': string_data
-        })
+            'strings': string_data,
+            'debug': {
+                'totalStrings': len(all_strings),
+                'stringsWithTranslations': sum(1 for s in string_data if s['hasTranslation']),
+                'stringsWithoutTranslations': sum(1 for s in string_data if not s['hasTranslation'])
+            }
+        }
+        
+        logger.info(f"Returning {len(string_data)} strings to frontend: {response_data['debug']}")
+        
+        return jsonify(response_data)
         
     except Exception as e:
         return jsonify({
