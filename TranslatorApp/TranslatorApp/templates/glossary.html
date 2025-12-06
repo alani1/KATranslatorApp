@@ -58,27 +58,33 @@
 
 {% if user.isAdmin() %}
 <hr />
-only for Admins / Deepl Gloassaries
+only for Admins / Deepl Glossaries
 <table id="GlossaryTable" class="display" width="100%"></table>
 
-<h3>Create/Upload New Glossary:</h3>
+{% if newGlossaryWarning %}
+<div class="alert alert-warning" role="alert">
+    <strong>⚠️ New Glossary Created!</strong><br>
+    The default glossary was not found and a new one was created with ID: <code>{{ newGlossaryId }}</code><br><br>
+    <strong>Action Required:</strong>
+    <ol>
+        <li>Update <code>Configuration.py</code> with the new <code>defaultGlossaryId = "{{ newGlossaryId }}"</code></li>
+        <li>Notify <a href="mailto:i18n_support@khanacademy.org?subject=DeepL%20Glossary%20ID%20Update&body=Please%20update%20the%20DeepL%20glossary%20ID%20to:%20{{ newGlossaryId }}">i18n_support@khanacademy.org</a> to update the glossary ID in the production configuration.</li>
+    </ol>
+</div>
+{% endif %}
+
+<h3>Update DeepL Glossary:</h3>
 <form action='{{baseURL}}/glossary/addGlossary' method="post" enctype="multipart/form-data">
-    <button type="submit" class="btn btn-primary">Deepl Upload</button>
+    <button type="submit" class="btn btn-primary">Update Deepl Glossary</button>
 </form>
+<p class="text-muted"><small>This will update the existing glossary entries while preserving the glossary ID.</small></p>
 
 
 <script>
 
     myGrid = new gridjs.Grid({
         columns: [
-            'Name', 'Source', 'Target', 'Creation Date', 'Entries', 'ID',
-            {
-                id: "Actions", name: "Actions",
-
-                formatter: (cell, row) => {
-                    return gridjs.html(`<button type="button" class="btn btn-danger" onclick="deleteGlossary('${row.cells[5].data}');">Delete</button>`);
-                }
-            }
+            'Name', 'Source', 'Target', 'Creation Date', 'Entries', 'ID'
         ],
         server: {
             url: '{{baseURL}}/glossary/data',

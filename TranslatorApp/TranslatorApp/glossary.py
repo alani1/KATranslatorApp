@@ -10,41 +10,87 @@ import pymysql
 import requests
 from TranslatorApp.user import User
 
-def deeplCreateGlossary(entries):
+def deeplGlossaryExists(glossaryId):
+    """Check if a glossary exists in DeepL (v3 API)"""
+    url = f"https://api-free.deepl.com/v3/glossaries/{glossaryId}"
+    headers = {'Authorization': 'DeepL-Auth-Key ' + Configuration.deeplAPI}
+    
+    try:
+        result = requests.get(url, headers=headers, timeout=10)
+        return result.status_code == 200
+    except requests.RequestException:
+        return False
 
-    url = "https://api-free.deepl.com/v2/glossaries"
-    headers = { 'Authorization': 'DeepL-Auth-Key '+ Configuration.deeplAPI }
-    data = {
-        'name': 'TranslatorApp Glossary',
-        'source_lang': "en",
-        'target_lang': "de",
+
+def deeplUpdateGlossary(glossaryId, entries):
+    """Update existing glossary entries using DeepL v3 PUT (replaces all entries, preserves ID)"""
+    url = f"https://api-free.deepl.com/v3/glossaries/{glossaryId}/dictionaries"
+    headers = {
+        'Authorization': 'DeepL-Auth-Key ' + Configuration.deeplAPI,
+        'Content-Type': 'application/json'
+    }
+    payload = {
+        'source_lang': 'EN',
+        'target_lang': 'DE',
         'entries': entries,
         'entries_format': 'tsv'
     }
-    result = requests.post(
-        url , headers=headers,
-        data=data)
+    
+    try:
+        result = requests.put(url, headers=headers, json=payload, timeout=30)
+        print(f"DeepL v3 Update Response: {result.status_code} - {result.text}")
+        
+        if result.status_code == 200:
+            return {'success': True, 'data': result.json()}
+        else:
+            return {'success': False, 'error': result.text, 'status_code': result.status_code}
+    except requests.RequestException as e:
+        return {'success': False, 'error': str(e)}
 
-    print(result.json())
 
-    ## check the result and do proper error handling
-    if result.status_code != 200:
-        return "Error: " + result.text
-    else:
-        return result
+def deeplCreateGlossary(entries):
+    """Create a new glossary using DeepL v3 API"""
+    url = "https://api-free.deepl.com/v3/glossaries"
+    headers = {
+        'Authorization': 'DeepL-Auth-Key ' + Configuration.deeplAPI,
+        'Content-Type': 'application/json'
+    }
+    payload = {
+        'name': Configuration.defaultGlossaryName,
+        'dictionaries': [{
+            'source_lang': 'EN',
+            'target_lang': 'DE',
+            'entries': entries,
+            'entries_format': 'tsv'
+        }]
+    }
+    
+    try:
+        result = requests.post(url, headers=headers, json=payload, timeout=30)
+        print(f"DeepL v3 Create Response: {result.status_code} - {result.text}")
+        
+        if result.status_code in (200, 201):
+            data = result.json()
+            return {'success': True, 'glossary_id': data.get('glossary_id'), 'data': data}
+        else:
+            return {'success': False, 'error': result.text, 'status_code': result.status_code}
+    except requests.RequestException as e:
+        return {'success': False, 'error': str(e)}
 
 def deeplDeleteGlossary(glossaryId):
-
-    url = "https://api-free.deepl.com/v2/glossaries/" + glossaryId
-    headers = { 'Authorization': 'DeepL-Auth-Key '+ Configuration.deeplAPI }
+    """Delete a glossary using DeepL v3 API"""
+    url = f"https://api-free.deepl.com/v3/glossaries/{glossaryId}"
+    headers = {'Authorization': 'DeepL-Auth-Key ' + Configuration.deeplAPI}
     
-    result = requests.delete(url, headers=headers)
-
-    ## check the result and do proper error handling
-    if result.status_code != 200:
-        return "Error: " + result.text
-    else:
-        return result
+    try:
+        result = requests.delete(url, headers=headers, timeout=10)
+        
+        if result.status_code in (200, 204):
+            return {'success': True}
+        else:
+            return {'success': False, 'error': result.text, 'status_code': result.status_code}
+    except requests.RequestException as e:
+        return {'success': False, 'error': str(e)}
 
 
 
@@ -173,46 +219,75 @@ def deleteEntry(id):
 
     return jsonify(result)          
 
-#This function loads the list of Deeply Glossaries from the API
+#This function loads the list of DeepL Glossaries from the API (v3)
 @bp.route('/data', methods = ['GET'])
 def listGlossary():
-    glossaryList = ""
+    url = "https://api-free.deepl.com/v3/glossaries"
+    headers = {'Authorization': 'DeepL-Auth-Key ' + Configuration.deeplAPI}
+    
+    try:
+        result = requests.get(url, headers=headers, timeout=10)
+        data = result.json()
+        
+        # Transform v3 response to match expected format for UI
+        # v3 returns dictionaries array instead of entry_count directly
+        glossaries = data.get('glossaries', [])
+        for g in glossaries:
+            # Get entry_count from first dictionary if available
+            dictionaries = g.get('dictionaries', [])
+            if dictionaries:
+                g['entry_count'] = dictionaries[0].get('entry_count', 0)
+            else:
+                g['entry_count'] = 0
+        
+        return jsonify({'glossaries': glossaries})
+    except requests.RequestException as e:
+        return jsonify({'error': str(e), 'glossaries': []})
 
-    url = "https://api-free.deepl.com/v2/glossaries"
-    headers = { 'Authorization': 'DeepL-Auth-Key '+ Configuration.deeplAPI }    
-    result = requests.get(url,headers=headers)
-
-    #return the response as json array
-    return result.json()
-
-# Create a new Deepl Glossary with the .CSV format created from database
+# Update existing DeepL Glossary or create new one if not exists (v3 API)
 @bp.route('/addGlossary', methods = ['POST'])
 def addGlossary():
     message = ""
-    glossaryList = ""
+    newGlossaryWarning = False
+    newGlossaryId = None
     
     db = connectDB()
     user = User(db)
 
     if request.method == 'POST':
-            
-        
         cursor = db.cursor()
         cursor.execute("SELECT source, target FROM %s.`ka-glossary` order by id" % Configuration.dbDatabase)
         rows = cursor.fetchall()
 
         # Generate TSV string
         tsv_string = "\n".join("\t".join(map(str, row.values())).strip() for row in rows)
-        #print("TSV data with line numbers:\n", _tsv_string)
         
-        dResult = deeplCreateGlossary(tsv_string)
-        message = "Data uploaded and glossary created." + dResult
+        # Check if default glossary exists
+        glossaryId = Configuration.defaultGlossaryId
+        
+        if deeplGlossaryExists(glossaryId):
+            # Update existing glossary (preserves ID)
+            result = deeplUpdateGlossary(glossaryId, tsv_string)
+            if result.get('success'):
+                message = f"Glossary updated successfully! (ID: {glossaryId})"
+            else:
+                message = f"Error updating glossary: {result.get('error', 'Unknown error')}"
+        else:
+            # Glossary doesn't exist - create a new one
+            result = deeplCreateGlossary(tsv_string)
+            if result.get('success'):
+                newGlossaryId = result.get('glossary_id')
+                newGlossaryWarning = True
+                message = f"New glossary created with ID: {newGlossaryId}"
+            else:
+                message = f"Error creating glossary: {result.get('error', 'Unknown error')}"
                 
     return make_response(render_template('glossary.html',
         title='KA Deutsch - Deepl Glossary Mgmt',
         year=datetime.now().year,
         message=message,
-        gloassaryList=glossaryList,
+        newGlossaryWarning=newGlossaryWarning,
+        newGlossaryId=newGlossaryId,
         user=user,
         baseURL=Configuration.baseURL,
     ))
