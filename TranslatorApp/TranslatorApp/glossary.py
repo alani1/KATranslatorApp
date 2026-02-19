@@ -1,10 +1,9 @@
-## Module / Blueprint to manage DeepL Glossaries
+"""Blueprint for DeepL Glossary management — CRUD for glossary entries and DeepL API sync."""
 
 from datetime import datetime
-from pickletools import read_stringnl_noescape_pair
 from TranslatorApp import Configuration
 from flask import (
-    Blueprint, flash, g, redirect, render_template, make_response, request, session, jsonify
+    Blueprint, render_template, make_response, request, jsonify
 )
 import pymysql
 import requests
@@ -125,97 +124,96 @@ def connectDB():
     
     return dbConnection
 
-@bp.route('/entries', methods = ['GET'])
+@bp.route('/entries', methods=['GET'])
 def listEntries():
-    entries = []
-    #db = pymysql.connect(host=Configuration.dbHost, user=Configuration.dbUser, password=Configuration.dbPassword, db=Configuration.dbDatabase)
+    """Return all glossary entries as JSON."""
     db = connectDB()
-    cursor = db.cursor()
-    cursor.execute("SELECT * from %s.`ka-glossary`" % Configuration.dbDatabase)
-    result = cursor.fetchall()
+    try:
+        cursor = db.cursor()
+        cursor.execute("SELECT * FROM `ka-glossary`")
+        result = cursor.fetchall()
+        cursor.close()
+    finally:
+        db.close()
     
     return jsonify(result)
 
 
-#this function creates glossary entries to the database
-@bp.route('/entries/', methods = ['POST'])
+@bp.route('/entries/', methods=['POST'])
 def createEntry():
+    """Create a new glossary entry from POST JSON data. Requires admin."""
     db = connectDB()
     user = User(db)
 
-    if ( not user.isAdmin()):
-        print("Error: User does not have proper permissions")
-        return ""
+    if not user.isAdmin():
+        return jsonify({'error': 'Insufficient permissions'}), 403
     
-    data = {}
-    rData = request.get_json()
-    
-    # Access individual items in the JSON array
-    data['category'] = rData['category']
-    data['source'] = rData['source']
-    data['target'] = rData['target']
-    data['comment'] = rData['comment']
+    try:
+        rData = request.get_json()
+        category = rData['category']
+        source = rData['source']
+        target = rData['target']
+        comment = rData['comment']
 
-    cursor = db.cursor()
-    sql = "INSERT INTO %s.`ka-glossary` (%s) VALUES ('%s')" % (Configuration.dbDatabase, ', '.join(data.keys()), "', '".join(data.values()))
-    print(sql)
-    cursor.execute(sql)
-    result = cursor.fetchall()
-            
-    db.commit()
-    db.close()
+        cursor = db.cursor()
+        sql = "INSERT INTO `ka-glossary` (category, source, target, comment) VALUES (%s, %s, %s, %s)"
+        cursor.execute(sql, (category, source, target, comment))
+        result = cursor.fetchall()
+
+        db.commit()
+        cursor.close()
+    finally:
+        db.close()
 
     return jsonify(result)
 
-#this function saves glossary entries to the database
-@bp.route('/entries/<id>', methods = ['POST'])
+@bp.route('/entries/<id>', methods=['POST'])
 def saveData(id):
-
+    """Update an existing glossary entry by ID. Requires admin."""
     db = connectDB()
     user = User(db)
 
-    if ( not user.isAdmin()):
-        print("Error: User does not have proper permissions")
-        return ""
+    if not user.isAdmin():
+        return jsonify({'error': 'Insufficient permissions'}), 403
     
-    data = {}
-    rData = request.get_json()
-    
-    # Access individual items in the JSON array
-    data['id'] = id
-    data['category'] = rData['category']
-    data['source'] = rData['source']
-    data['target'] = rData['target']
-    data['comment'] = rData['comment']
+    try:
+        rData = request.get_json()
+        category = rData['category']
+        source = rData['source']
+        target = rData['target']
+        comment = rData['comment']
 
-    cursor = db.cursor()
-    sql = "UPDATE %s.`ka-glossary` SET " % Configuration.dbDatabase + ', '.join(["{} = '{}'".format(k,v) for k,v in data.items()]) + " WHERE id = '%s'" % data['id']
+        cursor = db.cursor()
+        sql = "UPDATE `ka-glossary` SET category = %s, source = %s, target = %s, comment = %s WHERE id = %s"
+        cursor.execute(sql, (category, source, target, comment, id))
+        result = cursor.fetchall()
 
-    cursor.execute(sql)
-    result = cursor.fetchall()
-            
-    db.commit()
-    db.close()
+        db.commit()
+        cursor.close()
+    finally:
+        db.close()
 
     return jsonify(result)
 
-@bp.route('/entries/<id>', methods = ['DELETE'])
+@bp.route('/entries/<id>', methods=['DELETE'])
 def deleteEntry(id):
-
+    """Delete a glossary entry by ID. Requires admin."""
     db = connectDB()
     user = User(db)
 
-    if ( not user.isAdmin()):
-        print("Error: User does not have proper permissions")
-        return ""
+    if not user.isAdmin():
+        return jsonify({'error': 'Insufficient permissions'}), 403
     
-    cursor = db.cursor()
-    sql = "DELETE FROM %s.`ka-glossary` WHERE id = '%s'" % (Configuration.dbDatabase, id)
-    cursor.execute(sql)
-    result = cursor.fetchall()
-            
-    db.commit()
-    db.close()
+    try:
+        cursor = db.cursor()
+        sql = "DELETE FROM `ka-glossary` WHERE id = %s"
+        cursor.execute(sql, (id,))
+        result = cursor.fetchall()
+
+        db.commit()
+        cursor.close()
+    finally:
+        db.close()
 
     return jsonify(result)          
 
@@ -256,7 +254,7 @@ def addGlossary():
 
     if request.method == 'POST':
         cursor = db.cursor()
-        cursor.execute("SELECT source, target FROM %s.`ka-glossary` order by id" % Configuration.dbDatabase)
+        cursor.execute("SELECT source, target FROM `ka-glossary` ORDER BY id")
         rows = cursor.fetchall()
 
         # Generate TSV string
@@ -298,9 +296,8 @@ def deleteGlossary(id):
     db = connectDB()
     user = User(db)
 
-    if ( not user.isAdmin()):
-        print("Error: User does not have proper permissions")
-        return ""
+    if not user.isAdmin():
+        return jsonify({'error': 'Insufficient permissions'}), 403
     
     result = deeplDeleteGlossary(id)
 

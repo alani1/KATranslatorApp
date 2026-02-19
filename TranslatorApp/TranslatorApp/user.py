@@ -1,10 +1,18 @@
+"""User authentication and permission management via WordPress database and cookies."""
 
 from TranslatorApp import Configuration
 import pymysql
 from flask import request
 
+
 class User(object):
-    def __init__(self,dbConnection):
+    """Represents an authenticated user with role-based permissions.
+    
+    Loads user identity from WordPress cookies and resolves permissions
+    from the WordPress wp_users and wp_usermeta database tables.
+    """
+
+    def __init__(self, dbConnection):
         self.dbConnection = dbConnection
         self.name = ''
         self.role = ''
@@ -20,47 +28,70 @@ class User(object):
         self.loadRoleFromDB()
 
     def isAdmin(self):
+        """Returns True if the user has administrator privileges (level >= 10)."""
         return self.user_level >= 10
 
     def isContributor(self):
-        #print("isContributor : %i" % self.user_level)
+        """Returns True if the user has contributor or higher privileges (level > 0)."""
         return self.user_level > 0
         
     def loadRoleFromDB(self):
-        #Load UserName From Database
-        sql = "select * from %s.`wp_users` where user_login='%s'" % (Configuration.dbDatabase, self.name)
-        cursor = self.dbConnection.cursor()
-        cursor.execute(sql)
-
-        #return if no user found
-        if (cursor.rowcount == 0):
+        """Load user role and permission level from WordPress database.
+        
+        Queries wp_users to verify the user exists, then loads wp_user_level
+        from wp_usermeta to determine the permission level.
+        Level 10 = administrator, Level 1+ = contributor, Level 0 = subscriber.
+        """
+        if not self.name:
             return
 
-        result = dict(cursor.fetchone())
+        cursor = self.dbConnection.cursor()
+        try:
+            # Load user from WordPress users table (parameterized query)
+            sql = "SELECT * FROM `wp_users` WHERE user_login = %s"
+            cursor.execute(sql, (self.name,))
 
-        #To be finished get the UserID, then load the permissions from wp_usermetadata in wp_capabilities and wp_user_level (Level 10 = administrator)
-        ID = result['ID']
-        permSQL = "select * from wp_usermeta where user_id='%s' and meta_key='wp_user_level'" % ID
-        cursor.execute(permSQL)
-        result = dict(cursor.fetchone())
-        self.user_level = int(result['meta_value'])
+            # Return if no user found
+            if cursor.rowcount == 0:
+                return
 
-        if (self.user_level >= 10):
-            self.role = 'administrator'
-        elif (self.user_level >= 1):
-            self.role = 'contributor'
-        else:
-            self.role = self.user_level 
+            result = dict(cursor.fetchone())
 
-    #Note: This should be made more secure by validating the Hash Values in the Fields
+            # Load permission level from wp_usermeta (parameterized query)
+            ID = result['ID']
+            permSQL = "SELECT * FROM wp_usermeta WHERE user_id = %s AND meta_key = 'wp_user_level'"
+            cursor.execute(permSQL, (ID,))
+
+            if cursor.rowcount == 0:
+                return
+
+            result = dict(cursor.fetchone())
+            self.user_level = int(result['meta_value'])
+
+            if self.user_level >= 10:
+                self.role = 'administrator'
+            elif self.user_level >= 1:
+                self.role = 'contributor'
+            else:
+                self.role = 'subscriber'
+        finally:
+            cursor.close()
+
     def checkUserCookie(self):
-        #Function checks if the UserCookie exists and loads permission from DB
+        """Check for WordPress login cookie and extract the username.
+        
+        Looks for a 'wordpress_logged_in_*' cookie, parses the username
+        from the first pipe-delimited field.
+        
+        Note: This should be made more secure by validating the HMAC hash
+        values in the cookie fields against the WordPress salt/key.
+        
+        Returns:
+            bool: True if a valid login cookie was found, False otherwise.
+        """
         for cookie in request.cookies:
-            #Check if the cookie matches a substring
-            if (cookie[:20] == 'wordpress_logged_in_'):
-                #explode value by |
-                #Replace escaped pipesymbol
-                cookieFields = request.cookies.get(cookie).replace('%7C','|').split('|')
+            if cookie[:20] == 'wordpress_logged_in_':
+                cookieFields = request.cookies.get(cookie).replace('%7C', '|').split('|')
                 self.name = cookieFields[0]
                 self.role = ''
                 return True

@@ -1,30 +1,65 @@
-## Configuration file for TranslatorApp
-## Copy this file to Configuration.py and fill in your actual values
-## DO NOT commit Configuration.py to version control
+"""Configuration template for TranslatorApp.
 
-# Database Configuration
+Copy this file to Configuration.py and fill in your actual values.
+DO NOT commit Configuration.py to version control — it is gitignored.
+"""
+
+# ── DeepL API ──────────────────────────────────────────────────
+# Get your API key from: https://www.deepl.com/pro-api
+deeplAPI = 'your-deepl-api-key-here'
+defaultGlossaryId = 'your-deepl-glossary-id'            # DeepL v3 Glossary ID (update if recreated)
+defaultGlossaryName = 'TranslatorApp Glossary'
+
+# ── Amara API ──────────────────────────────────────────────────
+# Get your API key from: https://amara.org/profiles/account
+amaraADMIN = 'your-amara-admin-api-key'                  # Amara Admin API key
+amaraAPI = 'your-amara-user-api-key'                      # Amara regular user API key
+
+# ── Google / YouTube API ───────────────────────────────────────
+googleAPI = 'your-google-api-key'
+
+# ── ElevenLabs API ─────────────────────────────────────────────
+elevenlabsAPI = 'your-elevenlabs-api-key'
+
+# ── Discord Webhook ────────────────────────────────────────────
+discordWebhookURL = 'https://discordapp.com/api/webhooks/your-webhook-url'
+
+# ── Azure Speech API ───────────────────────────────────────────
+azure_speech_key = 'your-azure-speech-key'
+azure_speech_region = 'eastus'                            # e.g. 'eastus', 'westeurope'
+
+# ── TTS Engine Selection ───────────────────────────────────────
+# Options: 'azure' or 'elevenlabs'
+tts = 'elevenlabs'
+
+# ── Database Settings ──────────────────────────────────────────
 dbHost = 'localhost'
 dbUser = 'your_db_user'
 dbPassword = 'your_db_password'
-dbDatabase = 'translator_db'
+dbDatabase = 'kadeutsch'
 
-# DeepL API Configuration
-# Get your API key from: https://www.deepl.com/pro-api
-deeplAPI = 'your-deepl-api-key-here'
+# ── Application Settings ──────────────────────────────────────
+baseURL = ''                                              # e.g. '' for dev, 'https://yourdomain.com' for prod
+mode = 'dev'                                              # 'dev' = skip cookie auth, use devUser
+devUser = 'your_username'                                 # Used when mode='dev'
 
-# Base URL for the application
-# Example: 'http://localhost:5000' for local development
-# or 'https://yourdomain.com/TranslatorApp' for production
-baseURL = 'http://localhost:5000'
+# ── Flask Secret Key ──────────────────────────────────────────
+# Generate with: python -c "import secrets; print(secrets.token_hex(32))"
+secret_key = 'generate-a-random-secret-key'
 
-# Focus Courses Configuration
-# Define the courses you want to track in statistics
+# ── Focus Courses ─────────────────────────────────────────────
+# Define the Khan Academy courses to track. Each entry needs:
+#   name         : Display name
+#   courses      : List of KA course slugs
+#   visible      : Show in UI navigation
+#   adminOnly    : (optional) Only show to admin users
+#   topicChampion: Responsible person's name, or 'vacant'
 focusCourses = {
-    'math': {
-        'name': 'Mathematics',
+    'math16': {
+        'name': 'Mathe 1-6',
+        'courses': ['cc-kindergarten-math', 'cc-1st-grade-math'],
         'visible': True,
-        'topicChampion': 'User1',
-        'courses': ['math-basics', 'algebra']
+        'topicChampion': 'Your Name',
     },
-    # Add more courses as needed
+    # Add more course groups as needed
 }

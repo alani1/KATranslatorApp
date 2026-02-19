@@ -6,6 +6,7 @@ from flask import (
 )
 import requests
 from TranslatorApp import Configuration
+from markupsafe import escape as html_escape
 import pymysql
 
 # Timeout (seconds) for all outbound HTTP requests to Amara and DeepL APIs
@@ -347,7 +348,7 @@ class Subtitles(object):
         if (result):
             return subtitle
         elif result.status_code == 403: #Forbidden
-            self.message = "403: Access to this Subtitle is Forbidden for you. Maybe the subtitle is assigned to someone else already<br/>" + str(result.text) + str(getAmaraEditorLink(amaraID))
+            self.message = "403: Access to this Subtitle is Forbidden for you. Maybe the subtitle is assigned to someone else already<br/>" + str(html_escape(result.text)) + str(getAmaraEditorLink(amaraID))
             print(f"[SUBTITLE] Upload FAILED: 403 Forbidden")
             return ""
         else:
@@ -388,10 +389,10 @@ class Subtitles(object):
 
                     self.subtitleInfo = (
                         "<table class='table'>"
-                        f"<tr><td>Translating Video</td><td><b>{title}</b></td></tr>"
+                        f"<tr><td>Translating Video</td><td><b>{html_escape(title)}</b></td></tr>"
                         f"<tr><td># Characters</td><td>{len(title) + len(description) + len(self.enSubtitle.text)}</td></tr>"
                         f"<tr><td>DeepL Chars Left</td><td>{self.getDeeplUsage()}</td></tr>"
-                        f"<tr><td>Amara ID</td><td>{amaraID}</td></tr>"
+                        f"<tr><td>Amara ID</td><td>{html_escape(amaraID)}</td></tr>"
                         "</table>"
                     )
 
@@ -423,7 +424,7 @@ class Subtitles(object):
                 
                     return self.translateSubtitleAndSubmit(self.enSubtitle, vid, False, 0)
 
-            self.message = "<b>Error, Khan Academy Team not found," + amaraID
+            self.message = "<b>Error, Khan Academy Team not found,</b> " + str(html_escape(amaraID))
 
         else:
             self.message = "<b>Unknown Video</b><br/>Youtube Video could not be found on amara.org"

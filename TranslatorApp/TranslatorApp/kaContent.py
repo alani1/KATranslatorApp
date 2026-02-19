@@ -1,8 +1,9 @@
+"""Blueprint for Khan Academy content backlog management — video assignment, status tracking, and filtering."""
 
 import json
 from datetime import datetime
 from flask import (
-    Blueprint, flash, g, redirect, render_template, make_response, request, session
+    Blueprint, render_template, make_response, request, jsonify
 )
 import requests
 from html import unescape
@@ -10,24 +11,22 @@ from TranslatorApp import Configuration
 from TranslatorApp.user import User
 from TranslatorApp.YoutubeDescriptionGenerator import DescriptionGenerator
 
-
 import pymysql
-from flask import Flask, jsonify
 
 
 
 class KAContent(object):
+    """Manages Khan Academy content backlog — video listing, assignment, and status updates."""
 
     message = 'Show the Videos in the Backlog'
 
     def __init__(self):
-
         self.connectDB()
         self.user = User(self.dbConnection)
     
 
     def connectDB(self):
-        # Connect to the database
+        """Create and store a new database connection."""
         self.dbConnection = pymysql.connect(host=Configuration.dbHost,
                     user=Configuration.dbUser,
                     password=Configuration.dbPassword,
@@ -36,7 +35,15 @@ class KAContent(object):
                     cursorclass=pymysql.cursors.DictCursor)
 
     def focusCourseCondition(self, course):
-        if not course in Configuration.focusCourses and course != 'all':
+        """Build a SQL IN-clause value list for the given course group.
+        
+        Args:
+            course: A key from Configuration.focusCourses, or 'all' for all courses.
+        
+        Returns:
+            Comma-separated quoted course names for use in SQL IN clauses.
+        """
+        if course not in Configuration.focusCourses and course != 'all':
             return ''
 
         if (course == 'all'):
@@ -55,120 +62,154 @@ class KAContent(object):
 
     # Load all users with permission contributore (1 or higher)
     def getUsers(self):
-
+        """Load all users with contributor permissions (level > 0)."""
         with self.dbConnection.cursor() as cursor:
-            sql = "SELECT user_nicename FROM %s.wp_users, %s.wp_usermeta WHERE wp_users.id = wp_usermeta.user_id AND wp_usermeta.meta_key='wp_user_level' AND wp_usermeta.meta_value > 0 ORDER BY user_login" % (Configuration.dbDatabase,Configuration.dbDatabase)
+            sql = ("SELECT user_nicename FROM wp_users, wp_usermeta "
+                   "WHERE wp_users.id = wp_usermeta.user_id "
+                   "AND wp_usermeta.meta_key = 'wp_user_level' "
+                   "AND wp_usermeta.meta_value > 0 ORDER BY user_login")
             cursor.execute(sql)
             result = cursor.fetchall()
             return result
 
-    #Check if Video is already assigned to User
     def ifAssigned(self, id):
+        """Check if a video is already assigned to a user.
         
+        Returns:
+            True if the video IS assigned (translator is not NULL), False otherwise.
+        """
         with self.dbConnection.cursor() as cursor:
-            sql = "SELECT * FROM %s.`ka-content` where id='%s' AND translator IS NULL" % (Configuration.dbDatabase, id)
-
-            cursor.execute(sql)
+            sql = "SELECT * FROM `ka-content` WHERE id = %s AND translator IS NULL"
+            cursor.execute(sql, (id,))
             result = cursor.fetchall()
             
-            if len(result)>0:
+            if len(result) > 0:
                 return False
 
         return True
 
-    #Load Data from Content Database
-    def loadData(self,user, filter, showAll=False):
-
+    def loadData(self, user, filter, showAll=False):
+        """Load content items from database with filtering.
+        
+        Args:
+            user: Optional translator username to filter by.
+            filter: Course group key or special filter ('approval', 'assigned', 'publish').
+            showAll: If True, include all statuses regardless of filter.
+        
+        Returns:
+            JSON response with matching content items.
+        """
         noDuplicates = False
-        # Only select Items which are in Backlog        
+        params = []
+
         with self.dbConnection.cursor() as cursor:
-            sql = "SELECT * FROM %s.`ka-content`" % Configuration.dbDatabase
+            sql = "SELECT * FROM `ka-content`"
 
             where = []
 
-            #When user specified show only this users Backlog
-            if (user != None and user != ''):
-                where.append("translator = '%s'" % user)
+            # When user specified, show only this user's backlog
+            if user is not None and user != '':
+                where.append("translator = %s")
+                params.append(user)
 
-                if (not showAll):
-                    where.append("(translation_status = '' or translation_status = 'Assigned')")
+                if not showAll:
+                    where.append("(translation_status = '' OR translation_status = 'Assigned')")
             
-            #Limit to not Translated Videos unless showAll is specified or "approval-backlog"
+            # Limit to untranslated videos unless showAll or special filter
             elif (not showAll) and filter != "approval" and filter != "assigned" and filter != "publish":
-                where.append("(translation_status = '' or translation_status is NULL)")
+                where.append("(translation_status = '' OR translation_status IS NULL)")
             
-            #build filterCondtion for focus courses
+            # Build filter condition for focus courses
             filterCondition = self.focusCourseCondition(filter)
-            if (filter == "approval"):
+            if filter == "approval":
                 noDuplicates = True
                 where.append("(translation_status = 'Translated')")
 
-            if (filter == "assigned"):
+            if filter == "assigned":
                 noDuplicates = True
                 where.append("(translation_status = 'Assigned')")
 
-            # Include all Published Courses
-            if (filter == "publish"):
+            if filter == "publish":
                 noDuplicates = True
                 
                 where.append("( `ka-content`.dubbed = 'True' or `ka-content`.subbed = 'True' ) AND `ka-content`.listed_anywhere = 'False'")
                 where.append("course in (%s)" % self.focusCourseCondition("all"))
 
-            if (filter in Configuration.focusCourses):
+            if filter in Configuration.focusCourses:
                 where.append("course in (%s)" % filterCondition)
 
-            # For Computing we add domain = 'computing' and filter for the courses, not sure this is required
-            if (filter == "computing"):
+            if filter == "computing":
                 where.append("domain = 'computing'")
                 where.append("course in (%s)" % filterCondition)
             
-            #Always filter for Videos which are neither dubbed nor subbed
-            if (True):
-                #where.append("backlog='1'")
-                where.append("(kind='Video' or kind='Talkthrough')")
+            # Always filter for video content types
+            where.append("(kind='Video' OR kind='Talkthrough')")
 
-            if ( not showAll and filter != "publish"):
+            if not showAll and filter != "publish":
                 where.append("dubbed='False'")
                 where.append("subbed='False'")
 
-            if (len(where)>0):
-                sql = sql + " where " + " AND ".join(where)
+            if len(where) > 0:
+                sql = sql + " WHERE " + " AND ".join(where)
 
-            #Add Group By to avoid duplicates
-            if (noDuplicates):
+            # Add GROUP BY to avoid duplicates
+            if noDuplicates:
                 sql = sql + " GROUP BY id"
 
             print(sql)
 
-            cursor.execute(sql)
+            cursor.execute(sql, params)
             result = cursor.fetchall()
         return jsonify(result)
 
 
     
 
-    def saveData(self,data):
-        if (len(data)> 0):
+    def saveData(self, data):
+        """Save updated content data to the database.
+        
+        Updates specific allowed fields for a content item, then triggers
+        YouTube description generation.
+        
+        Args:
+            data: Dict with 'id' and fields to update (translator, translation_date,
+                  translation_status, translation_comment).
+        
+        Returns:
+            JSON response confirming the update.
+        """
+        if len(data) == 0:
+            print("empty data")
+            return jsonify({'error': 'No data provided'}), 400
 
-            self.connectDB()
-            cursor = self.dbConnection.cursor()
-            sql = "UPDATE %s.`ka-content` SET " % Configuration.dbDatabase + ', '.join(["{} = '{}'".format(k,v) for k,v in data.items()]) + " WHERE id = '%s'" % data['id']
+        self.connectDB()
+        cursor = self.dbConnection.cursor()
+        try:
+            # Parameterized UPDATE with explicit allowed columns
+            allowed_fields = ['translator', 'translation_date', 'translation_status', 'translation_comment']
+            set_clauses = []
+            values = []
+            for field in allowed_fields:
+                if field in data:
+                    set_clauses.append(f"`{field}` = %s")
+                    values.append(data[field])
+            
+            if not set_clauses:
+                return jsonify({'error': 'No valid fields to update'}), 400
 
-            cursor.execute(sql)
+            values.append(data['id'])
+            sql = "UPDATE `ka-content` SET " + ', '.join(set_clauses) + " WHERE id = %s"
+            cursor.execute(sql, tuple(values))
             self.dbConnection.commit()
+            cursor.close()
+        finally:
             self.dbConnection.close()
 
-            # Generate the Youtube Description
-            ytData = DescriptionGenerator(data['id'])
-            ytData.generateYoutubeData()
+        # Generate the YouTube Description
+        ytData = DescriptionGenerator(data['id'])
+        ytData.generateYoutubeData()
 
-
-            result = cursor.fetchall()
-            return jsonify(result)
-
-
-        else:
-            print("empty data")
+        return jsonify({'success': True})
         
     def render(self, domainFilter="math16"):
 
@@ -253,9 +294,9 @@ def content():
 def assignToUser(id):
     v = KAContent()
 
-    if ( not v.user.isContributor()):
+    if not v.user.isContributor():
         print("Assignment-Error: User does not have proper permissions")
-        return jsonify("")
+        return jsonify({'error': 'Insufficient permissions'}), 403
     
     data = {}
     data['id'] = id
@@ -263,8 +304,8 @@ def assignToUser(id):
     data['translation_date'] = datetime.today().strftime("%Y-%m-%d")
     data['translation_status'] = "Assigned"
 
-    #TODO: Check if the Content Element is not assigned alreay (Status must be empty!)
-    if (v.ifAssigned(id)):
+    #TODO: Check if the Content Element is not assigned already (Status must be empty!)
+    if v.ifAssigned(id):
         print("Error: The Video is already assigned to user")
         return jsonify("The Video is already assigned to user")
     else:
@@ -274,9 +315,8 @@ def assignToUser(id):
 def saveData(id):
     v = KAContent()
 
-    if ( not v.user.isAdmin()):
-        print("Error: User does not have proper permissions")
-        return ""
+    if not v.user.isAdmin():
+        return jsonify({'error': 'Insufficient permissions'}), 403
     
     data = {}
     rData = request.get_json()
