@@ -13,5 +13,5 @@ logging.basicConfig(stream=sys.stderr)
 sys.path.insert(0,"/var/www/vhosts/kadeutsch.org/TranslatorApp/TranslatorApp")
 
 from TranslatorApp import app as application
-application.secret_key = "MySecretKey1"
+# secret_key is set in TranslatorApp/__init__.py from Configuration.py
 
