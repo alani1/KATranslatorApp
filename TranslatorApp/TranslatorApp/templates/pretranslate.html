@@ -64,7 +64,14 @@
                                 Remember credentials in browser (saved locally, not on server)
                             </label>
                         </div>
-                        
+
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="withoutTranslations">
+                            <label class="form-check-label" for="withoutTranslations">
+                                Without translations (only load strings that have no German translation yet)
+                            </label>
+                        </div>
+
                         <hr>
                         
                         <button type="submit" class="btn btn-primary btn-lg" id="fetchBtn">
@@ -299,7 +306,8 @@
         var data = {
             crowdinApiKey: $('#crowdinApiKey').val(),
             projectId: $('#projectId').val(),
-            fileId: $('#fileId').val()
+            fileId: $('#fileId').val(),
+            withoutTranslations: $('#withoutTranslations').is(':checked')
         };
         
         // Send request to backend

@@ -730,38 +730,44 @@ def fetch_strings():
     """Fetch strings from Crowdin with existing translations (Step 1)"""
     db = connectDB()
     user = User(db)
-    
+
     if not user.isAdmin():
         return jsonify({
             'success': False,
             'error': 'User does not have proper permissions'
         }), 403
-    
+
     try:
         data = request.get_json()
-        
+
         projectId = data.get('projectId')
         fileId = data.get('fileId')
         crowdinApiKey = data.get('crowdinApiKey')
-        
+        withoutTranslations = data.get('withoutTranslations', False)
+
         # Validate required parameters
         if not all([projectId, fileId, crowdinApiKey]):
             return jsonify({
                 'success': False,
                 'error': 'Missing required parameters'
             }), 400
-        
+
         # Fetch strings from Crowdin with existing translations
         strings_result = crowdinGetStrings(projectId, fileId, crowdinApiKey, targetLang='de')
-        
+
         if not strings_result['success']:
             return jsonify({
                 'success': False,
                 'error': strings_result['error']
             }), 500
-        
+
         all_strings = strings_result['strings']
-        
+
+        # Filter strings if withoutTranslations is True
+        if withoutTranslations:
+            all_strings = [s for s in all_strings if not s.get('hasTranslation', False)]
+            logger.info(f"Filtered to {len(all_strings)} strings without translations")
+
         # Prepare string data for display
         string_data = []
         for string_obj in all_strings:
@@ -772,7 +778,7 @@ def fetch_strings():
                 'stringId': string_obj['id'],
                 'hasTranslation': string_obj.get('hasTranslation', False)
             })
-        
+
         # Add debug info to help diagnose issues
         response_data = {
             'success': True,
@@ -780,12 +786,13 @@ def fetch_strings():
             'debug': {
                 'totalStrings': len(all_strings),
                 'stringsWithTranslations': sum(1 for s in string_data if s['hasTranslation']),
-                'stringsWithoutTranslations': sum(1 for s in string_data if not s['hasTranslation'])
+                'stringsWithoutTranslations': sum(1 for s in string_data if not s['hasTranslation']),
+                'filtered': withoutTranslations
             }
         }
-        
+
         logger.info(f"Returning {len(string_data)} strings to frontend: {response_data['debug']}")
-        
+
         return jsonify(response_data)
         
     except Exception as e:
