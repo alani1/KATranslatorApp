@@ -104,6 +104,38 @@ The Crowdin Pre-Translation feature uses a three-step workflow that gives you fu
 - Configuration.py is gitignored to prevent accidental credential commits
 - Only administrators can access the pre-translation feature
 
+## Database Migrations
+
+The app uses a lightweight SQL migration runner (`migrate.py`) to track and apply schema changes. Migrations live in the `TranslatorApp/migrations/` folder and are applied in filename order.
+
+### Running Migrations
+
+```bash
+cd TranslatorApp
+python migrate.py
+```
+
+This will:
+- Create a `schema_migrations` table (if it doesn't exist) to track applied migrations
+- Apply any `.sql` files in `migrations/` that haven't been run yet
+- Skip already-applied migrations safely (idempotent)
+
+### Applied Migrations
+
+| Migration | Description |
+|-----------|-------------|
+| `0001_widen_thumbnail_url.sql` | Widens `thumbnail_url` column on `ka-content` table from VARCHAR(140) to VARCHAR(500). Required because TSV exports from the Translation Portal contain thumbnail URLs that exceed the old 140-character limit, causing a `DataError` in `TranslationPortalUpdate.py`. |
+
+### Adding a New Migration
+
+Create a new `.sql` file in `TranslatorApp/migrations/` with a sequential prefix, e.g.:
+
+```
+migrations/0002_your_description.sql
+```
+
+The file should contain plain SQL statements separated by semicolons. Comment lines (`--`) are ignored. Run `python migrate.py` to apply it.
+
 ## Contributing
 
 Contributions are welcome! Please ensure your code follows the existing style and structure.
