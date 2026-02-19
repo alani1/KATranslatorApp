@@ -17,40 +17,49 @@ Write-Host "=== TranslatorApp Validation ===" -ForegroundColor Cyan
 Write-Host "Target: $BaseUrl"
 Write-Host ""
 
-# Activate venv if it exists
-$venvActivate = Join-Path $scriptDir ".venv\Scripts\Activate.ps1"
-if (Test-Path $venvActivate) {
-    & $venvActivate
+# Resolve Python executable — prefer venv, fall back to system
+$venvPython = Join-Path $scriptDir ".venv\Scripts\python.exe"
+if (Test-Path $venvPython) {
+    $pythonExe = $venvPython
+    Write-Host "Using venv Python: $pythonExe" -ForegroundColor Gray
+} else {
+    $pythonExe = "python"
+    Write-Host "Using system Python" -ForegroundColor Gray
 }
 
 $serverProcess = $null
 
 if (-not $NoServer -and $BaseUrl -eq "http://localhost:5555") {
-    Write-Host "Starting dev server..." -ForegroundColor Yellow
-    $serverProcess = Start-Process -FilePath "python" `
+    Write-Host "Starting dev server in background..." -ForegroundColor Yellow
+    $serverProcess = Start-Process -FilePath $pythonExe `
         -ArgumentList "runserver.py" `
         -WorkingDirectory $scriptDir `
         -PassThru -WindowStyle Hidden
 
-    # Wait for server to be ready
+    Write-Host "  Server PID: $($serverProcess.Id)" -ForegroundColor Gray
+
+    # Wait for server to be ready (poll /health every second)
     $ready = $false
-    for ($i = 0; $i -lt 15; $i++) {
+    for ($i = 0; $i -lt 20; $i++) {
         Start-Sleep -Seconds 1
         try {
-            $null = Invoke-WebRequest -Uri "$BaseUrl/health" -TimeoutSec 2 -ErrorAction Stop
-            $ready = $true
-            break
+            $resp = Invoke-WebRequest -Uri "$BaseUrl/health" -UseBasicParsing -TimeoutSec 3 -ErrorAction SilentlyContinue
+            if ($resp -and $resp.StatusCode -eq 200) {
+                $ready = $true
+                break
+            }
         } catch {
-            # Server not ready yet
+            # Server not ready yet — keep waiting
         }
+        Write-Host "  ...waiting ($($i+1)s)" -ForegroundColor Gray
     }
 
     if (-not $ready) {
-        Write-Host "ERROR: Server did not start within 15 seconds" -ForegroundColor Red
+        Write-Host "ERROR: Server did not start within 20 seconds" -ForegroundColor Red
         if ($serverProcess -and !$serverProcess.HasExited) { Stop-Process -Id $serverProcess.Id -Force }
         exit 1
     }
-    Write-Host "Server is up." -ForegroundColor Green
+    Write-Host "Server is ready." -ForegroundColor Green
 }
 
 # Run smoke tests
@@ -60,14 +69,14 @@ $env:BASE_URL = $BaseUrl
 
 try {
     Push-Location $scriptDir
-    python -m pytest tests/test_smoke.py -v --tb=short
+    & $pythonExe -m pytest tests/test_smoke.py -v --tb=short
     $testResult = $LASTEXITCODE
 } finally {
     Pop-Location
     # Stop the server if we started it
     if ($serverProcess -and !$serverProcess.HasExited) {
         Write-Host ""
-        Write-Host "Stopping dev server..." -ForegroundColor Yellow
+        Write-Host "Stopping dev server (PID: $($serverProcess.Id))..." -ForegroundColor Yellow
         Stop-Process -Id $serverProcess.Id -Force
     }
 }
