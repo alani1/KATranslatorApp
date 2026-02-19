@@ -1,18 +1,20 @@
 ﻿import json
+import re
 from datetime import datetime
 from flask import (
-    Blueprint, flash, g, redirect, render_template, make_response, request, jsonify
+    Blueprint, flash, g, redirect, render_template, make_response, request, jsonify, Response
 )
 import requests
 from TranslatorApp import Configuration
 import pymysql
 
-
+# Timeout (seconds) for all outbound HTTP requests to Amara and DeepL APIs
+API_TIMEOUT = 30
 
 
 def jprint(obj):
-        text = json.dumps(obj, sort_keys=True, indent=4)
-        return text
+    """Pretty-print a JSON-serializable object."""
+    return json.dumps(obj, sort_keys=True, indent=4)
 
 def getAmaraEditorLink(amaraID):
     return '<a target=_new href="https://amara.org/subtitles/editor/' + amaraID + '/de?team=khan-academy">Link to Amara Editor</a><p/>' + '<a target=_new href="https://amara.org/teams/khan-academy/videos/' + amaraID + '/collaborations/">Amara assignment (for admins)</a><p/>'
@@ -25,15 +27,15 @@ class Subtitles(object):
 
     deeplAPI = Configuration.deeplAPI
 
-    def __init__(self, YTid = ""):
+    def __init__(self, YTid=""):
         self.YTid = ""
         self.amaraAPI = ""
         self.amaraID = ""
         self.force = False
         self.subtitleInfo = ""
-        self.enSubtitle = ""
+        self.enSubtitle = ""       # Will become a requests.Response once fetched
         self.translationStep = 0
-        self.message = "what is the message123??"
+        self.message = ""
 
         if len(YTid) > 0:
             self.YTid = YTid
@@ -49,8 +51,8 @@ class Subtitles(object):
             self.amaraAPI = request.form['amaraAPI']
 
         if 'force' in request.form:
-            self.message = "may the force be with you"
             self.force = request.form['force']
+            print(f"[SUBTITLE] Force flag set to: {self.force}")
 
 
     def connectDB(self):
@@ -62,81 +64,85 @@ class Subtitles(object):
                     charset='utf8mb4',
                     cursorclass=pymysql.cursors.DictCursor)
 
-    #Lookup the WP username
-    def getDBUserName(self,amaraUser):
-        sql = "SELECT wp_users.user_login as user FROM wp_users, wp_usermeta WHERE wp_usermeta.user_id = wp_users.ID AND wp_usermeta.meta_key='googleplus' AND wp_usermeta.meta_value='%s'" % amaraUser
+    def getDBUserName(self, amaraUser):
+        """Look up the WordPress username for a given Amara user via the usermeta 'googleplus' field."""
+        sql = (
+            "SELECT wp_users.user_login AS user "
+            "FROM wp_users "
+            "INNER JOIN wp_usermeta ON wp_usermeta.user_id = wp_users.ID "
+            "WHERE wp_usermeta.meta_key = 'googleplus' AND wp_usermeta.meta_value = %s"
+        )
         cursor = self.dbConnection.cursor()
-        cursor.execute(sql)
+        cursor.execute(sql, (amaraUser,))
         result = cursor.fetchall()
-        if (len(result) >0):
+        if len(result) > 0:
             return result[0]['user']
-        else:
-            return amaraUser
+        return amaraUser
 
-    def updateVideoStatus(self,stRequest):
-        
+    def updateVideoStatus(self, stRequest):
+        """Update translation status in the DB based on the Amara subtitle request state."""
         self.connectDB()
+        try:
+            # TODO: Check if user is allowed to update (e.g. Contributor role)
+            status = stRequest['work_status']
+            translator = self.getDBUserName(stRequest['subtitler']['username'])
 
-        #1. Check if User is allowed to update the status e.g. Contributor
-        #For this need to refactor User into own module
-        #if ( not v.user.isContributor()):
-        #    print("Assignment-Error: User does not have proper permissions")
-        #    return jsonify("")
-    
-        #2. Update the status in the DB
+            cursor = self.dbConnection.cursor()
 
-        data = {}
-        data['youtube_id'] = self.YTid
-        status = stRequest['work_status']
-        translator = self.getDBUserName(stRequest['subtitler']['username'])
-        
-        cursor = self.dbConnection.cursor()
-        sql = "SELECT * FROM %s.`ka-content` " % Configuration.dbDatabase + " WHERE youtube_id = '%s'" % data['youtube_id']
-        cursor.execute(sql)
-        result = cursor.fetchall()
-        if (len(result) == 0):
-            print("ERROR No result for SQL: " + sql)
-            return;
-        
-        current = result[0]
-        #print(current)
+            # Fetch current record
+            sql = "SELECT * FROM `ka-content` WHERE youtube_id = %s"
+            cursor.execute(sql, (self.YTid,))
+            result = cursor.fetchall()
+            if len(result) == 0:
+                print(f"[SUBTITLE] ERROR: No DB record found for youtube_id={self.YTid}")
+                return
 
-        #Always update Status / Date / Translator when status is empty
-        #TODO take Date/Time from stRequest
-        if current['translation_status'] == None:
-            data['translator'] = translator
-            if (status == 'being-subtitled'):
-                data['translation_status'] = 'Assigned'
-            elif (status == 'needs-reviewer' or status == 'beeing-reviewed'):
-                data['translation_status'] = 'Translated'
+            current = result[0]
 
-            data['translation_date'] = datetime.today().strftime("%Y-%m-%d")
+            # Determine which fields to update
+            update_fields = {}
 
-        #Current Status is Assigned but should be "Translated" because is alreay in review status
-        if (status == 'needs-reviewer' or status == 'beeing-reviewed') and current['translation_status'] == 'Assigned':
-            data['translator'] = translator
-            data['translation_status'] = 'Translated'
-            data['translation_date'] = datetime.today().strftime("%Y-%m-%d")
+            # Always update when status is empty
+            if current['translation_status'] is None:
+                update_fields['translator'] = translator
+                if status == 'being-subtitled':
+                    update_fields['translation_status'] = 'Assigned'
+                elif status in ('needs-reviewer', 'beeing-reviewed'):
+                    update_fields['translation_status'] = 'Translated'
+                update_fields['translation_date'] = datetime.today().strftime("%Y-%m-%d")
 
-        #Current Status is Translated but should be Approved because it is complete
-        if status == 'complete' and ( current['translation_status'] == 'Assigned' or current['translation_status'] == 'Translated'):
-            data['translation_status'] = 'Approved'
-        
-        sql = "UPDATE %s.`ka-content` SET " % Configuration.dbDatabase + ', '.join(["{} = '{}'".format(k,v) for k,v in data.items()]) + " WHERE youtube_id = '%s'" % data['youtube_id'] + " AND (translator is NULL OR translator = '%s')" % translator
+            # Assigned -> Translated (already in review)
+            if status in ('needs-reviewer', 'beeing-reviewed') and current['translation_status'] == 'Assigned':
+                update_fields['translator'] = translator
+                update_fields['translation_status'] = 'Translated'
+                update_fields['translation_date'] = datetime.today().strftime("%Y-%m-%d")
 
-        #print(sql)
-        cursor.execute(sql)
-        self.dbConnection.commit()
-        self.dbConnection.close()
+            # Translated -> Approved (complete)
+            if status == 'complete' and current['translation_status'] in ('Assigned', 'Translated'):
+                update_fields['translation_status'] = 'Approved'
+
+            if not update_fields:
+                return
+
+            # Build parameterized UPDATE
+            set_clause = ', '.join([f"`{k}` = %s" for k in update_fields])
+            values = list(update_fields.values())
+            values.extend([self.YTid, translator])
+            sql = f"UPDATE `ka-content` SET {set_clause} WHERE youtube_id = %s AND (translator IS NULL OR translator = %s)"
+
+            cursor.execute(sql, tuple(values))
+            self.dbConnection.commit()
+        finally:
+            self.dbConnection.close()
 
 
 
     def checkSTStep(self):
-
+        """Determine which workflow step the subtitle is at on Amara."""
         url = "https://amara.org/api/teams/khan-academy/subtitle-requests/?language=de&video=" + self.amaraID
         print(url)
-        headers = {'X-api-key': self.amaraAPI} 
-        response = requests.get(url,headers=headers).json()
+        headers = {'X-api-key': self.amaraAPI}
+        response = requests.get(url, headers=headers, timeout=API_TIMEOUT).json()
 
         if( response.get('objects') != None and len(response['objects']) > 0):
             status = response['objects'][0]['work_status']
@@ -173,12 +179,11 @@ class Subtitles(object):
         return jsonify(result)
 
     def hasGermanSubtitles(self):
-
+        """Check whether any German subtitle version already exists on Amara."""
         subInfoURL = "https://amara.org/api/videos/" + self.amaraID + "/languages/de"
-        headers = {'X-api-key': self.amaraAPI} 
-        subResult = requests.get(subInfoURL,headers=headers)
-        print(subInfoURL)
-        print("hasGermanSubtitles");
+        headers = {'X-api-key': self.amaraAPI}
+        subResult = requests.get(subInfoURL, headers=headers, timeout=API_TIMEOUT)
+        print(f"[SUBTITLE] hasGermanSubtitles: {subInfoURL}")
                             
         if subResult.status_code == 403:
             self.message = "Please add your Amara API Key, which you can find in your <a target=_new href='https://amara.org/profiles/account'>Amara Account Profile</a>"
@@ -199,7 +204,7 @@ class Subtitles(object):
 
 
     def render(self):
-        
+        """Build and return the full subtitle page response."""
         if len(self.YTid) > 0:
             self.getEnglishSubtitle()
         else:
@@ -221,71 +226,147 @@ class Subtitles(object):
 
 
         if len(self.amaraAPI) > 0:
-            resp.set_cookie('amaraAPI', self.amaraAPI)
+            resp.set_cookie('amaraAPI', self.amaraAPI, httponly=True, samesite='Lax')
     
         return resp
 
 
     def getDeeplUsage(self):
-
+        """Return remaining DeepL character quota as a string."""
         url = "https://api-free.deepl.com/v2/usage"
-        headers = { 'Authorization': 'DeepL-Auth-Key ' + self.deeplAPI }
-        result = requests.get(url,headers=headers)
-
-        result = result.json()
-        return str(result["character_limit"] - result["character_count"])
+        headers = {'Authorization': 'DeepL-Auth-Key ' + self.deeplAPI}
+        result = requests.get(url, headers=headers, timeout=API_TIMEOUT)
+        data = result.json()
+        return str(data["character_limit"] - data["character_count"])
 
     def deeplTranslate(self, content):
-
+        """Send text to DeepL for EN->DE translation. Returns the raw requests.Response."""
         url = "https://api-free.deepl.com/v2/translate"
-        headers = { 'Authorization': 'DeepL-Auth-Key '+ self.deeplAPI }
+        headers = {'Authorization': 'DeepL-Auth-Key ' + self.deeplAPI}
         data = {
             'target_lang': 'DE',
             'formality': 'less',
             'text': content
         }
-        result = requests.post(url,headers=headers, data=data)
-
+        result = requests.post(url, headers=headers, data=data, timeout=API_TIMEOUT)
         return result
 
+    def translateSRT(self, srt_text):
+        """Translate an SRT string cue-by-cue, preserving all timing and cue numbering."""
+        # Normalize line endings (Amara returns \r\n on Windows; must be \n for reliable splitting)
+        srt_text = srt_text.replace('\r\n', '\n').replace('\r', '\n')
+        blocks = re.split(r'\n\n+', srt_text.strip())
+        print(f"[SUBTITLE] translateSRT: {len(blocks)} cue blocks found")
+        if len(blocks) > 0:
+            print(f"[SUBTITLE] First block preview: {blocks[0][:120]}")
+        translated_blocks = []
+
+        for i, block in enumerate(blocks):
+            lines = block.split('\n')
+            if len(lines) < 3:
+                # Keep malformed or empty blocks as-is
+                print(f"[SUBTITLE] Block {i}: skipped (only {len(lines)} lines)")
+                translated_blocks.append(block)
+                continue
+
+            index = lines[0]       # cue number, e.g. "1"
+            timecode = lines[1]    # e.g. "00:00:01,000 --> 00:00:03,000"
+            cue_text = '\n'.join(lines[2:])  # may be multi-line within one cue
+
+            result = self.deeplTranslate(cue_text)
+            if not result:
+                print(f"[SUBTITLE] Block {i}: DeepL returned no result")
+                return None
+
+            translated_text = result.json()["translations"][0]["text"]
+            translated_blocks.append(f"{index}\n{timecode}\n{translated_text}")
+            print(f"[SUBTITLE] Block {i}/{len(blocks)}: translated OK")
+
+        if len(translated_blocks) != len(blocks):
+            raise RuntimeError(
+                f"Cue boundary violation: input={len(blocks)} output={len(translated_blocks)}"
+            )
+
+        print(f"[SUBTITLE] translateSRT: all {len(translated_blocks)} blocks translated")
+        return '\n\n'.join(translated_blocks)
+
+    def translateSRT_streaming(self, srt_text):
+        """Generator that translates SRT cue-by-cue, yielding SSE progress events.
+        Final event contains the complete translated SRT or an error."""
+        srt_text = srt_text.replace('\r\n', '\n').replace('\r', '\n')
+        blocks = re.split(r'\n\n+', srt_text.strip())
+        total = len(blocks)
+        print(f"[SUBTITLE] translateSRT_streaming: {total} cue blocks found")
+        translated_blocks = []
+
+        for i, block in enumerate(blocks):
+            lines = block.split('\n')
+            if len(lines) < 3:
+                translated_blocks.append(block)
+                yield f"data: {json.dumps({'cue': i + 1, 'total': total, 'status': 'skip'})}\n\n"
+                continue
+
+            index = lines[0]
+            timecode = lines[1]
+            cue_text = '\n'.join(lines[2:])
+
+            try:
+                result = self.deeplTranslate(cue_text)
+                if not result:
+                    yield f"data: {json.dumps({'error': f'DeepL returned no result for cue {i + 1}'})}\n\n"
+                    return
+                translated_text = result.json()["translations"][0]["text"]
+            except Exception as e:
+                yield f"data: {json.dumps({'error': f'DeepL error on cue {i + 1}: {str(e)}'})}\n\n"
+                return
+
+            translated_blocks.append(f"{index}\n{timecode}\n{translated_text}")
+            yield f"data: {json.dumps({'cue': i + 1, 'total': total, 'status': 'ok'})}\n\n"
+
+        full_srt = '\n\n'.join(translated_blocks)
+        yield f"data: {json.dumps({'cue': total, 'total': total, 'status': 'translating_meta'})}\n\n"
+        # Store the translated SRT for use by the route handler
+        self._translated_srt = full_srt
+        yield f"data: {json.dumps({'status': 'srt_done', 'total': total})}\n\n"
+
     def addNewSubtitle(self, amaraID, subtitle, title, description):
+        """Upload translated SRT subtitles to Amara as a draft."""
         url = "https://amara.org/api/videos/" + amaraID + "/languages/de/subtitles/"
-        headers = {'X-api-key': self.amaraAPI} 
+        headers = {'X-api-key': self.amaraAPI}
 
         data = {
-            'sub_format': 'txt',
+            'sub_format': 'srt',
             'title': title,
             'description': description,
             'subtitles': subtitle,
             'action': 'save-draft',
             'team': 'khan-academy'
         }
-        result = requests.post(url,headers=headers,data=data)
-        #403 is forbiddeen
+        result = requests.post(url, headers=headers, data=data, timeout=API_TIMEOUT)
+        print(f"[SUBTITLE] addNewSubtitle response: {result.status_code}")
         if (result):
             return subtitle
         elif result.status_code == 403: #Forbidden
             self.message = "403: Access to this Subtitle is Forbidden for you. Maybe the subtitle is assigned to someone else already<br/>" + str(result.text) + str(getAmaraEditorLink(amaraID))
+            print(f"[SUBTITLE] Upload FAILED: 403 Forbidden")
             return ""
         else:
+            print(f"[SUBTITLE] Upload FAILED: {result.status_code} - {result.text[:200]}")
             return str(result.status_code)
 
     def isAssignedToMe(self, amaraID):
+        """Check if the current user has subtitle actions available (i.e. is assigned)."""
         url = "https://amara.org/api/videos/" + amaraID + "/languages/de/subtitles/actions"
-        headers = {'X-api-key': self.amaraAPI} 
-        result = requests.get(url,headers=headers)
+        headers = {'X-api-key': self.amaraAPI}
+        result = requests.get(url, headers=headers, timeout=API_TIMEOUT)
+        return result.status_code == 200
 
-        if result.status_code == 200:
-            return True
-        else:
-            return False
-
-    #Download the English Subtitle based on YoutTubeID
+    # Download the English subtitle based on YouTube ID
     def getEnglishSubtitle(self):
-        # Load the Amara ID
+        """Resolve YouTube ID -> Amara video -> fetch English SRT -> trigger translation."""
         url = "https://amara.org/api/videos/?video_url=https://www.youtube.com/watch?v=" + self.YTid
-        headers = {'X-api-key': self.amaraAPI} 
-        response = requests.get(url,headers).json()
+        headers = {'X-api-key': self.amaraAPI}
+        response = requests.get(url, headers=headers, timeout=API_TIMEOUT).json()
         
         #make this more robust to handle when no result is found
         if ( response["meta"]["total_count"] > 0 and response.get('objects') != None and len(response['objects']) > 0):
@@ -299,29 +380,31 @@ class Subtitles(object):
                 description = vid['description']
 
                 #get the English subtitle if it is empty to avoid repeated calls
-                if ( not self.enSubtitle is object):
-                    ensubURL = "https://amara.org/api/videos/" + amaraID + "/languages/en/subtitles/?format=txt"
-                    self.enSubtitle = requests.get(ensubURL)
+                if isinstance(self.enSubtitle, str):
+                    ensubURL = "https://amara.org/api/videos/" + amaraID + "/languages/en/subtitles/?format=srt"
+                    print(f"[SUBTITLE] Fetching English SRT from: {ensubURL}")
+                    self.enSubtitle = requests.get(ensubURL, timeout=API_TIMEOUT)
+                    print(f"[SUBTITLE] English SRT response: {self.enSubtitle.status_code}, length={len(self.enSubtitle.text)}")
 
+                    self.subtitleInfo = (
+                        "<table class='table'>"
+                        f"<tr><td>Translating Video</td><td><b>{title}</b></td></tr>"
+                        f"<tr><td># Characters</td><td>{len(title) + len(description) + len(self.enSubtitle.text)}</td></tr>"
+                        f"<tr><td>DeepL Chars Left</td><td>{self.getDeeplUsage()}</td></tr>"
+                        f"<tr><td>Amara ID</td><td>{amaraID}</td></tr>"
+                        "</table>"
+                    )
 
-                    self.subtitleInfo = "<table class='table'><tr><td>Translating Video</td><td><b>" + title + "</b></td></tr>" \
-                    "<tr><td># Characters</td><td>" + str(len(title)+len(description)+len(self.enSubtitle.content)) + '</td></tr>' \
-                    "<tr><td>Deepl Chars Left</td><td>" + self.getDeeplUsage() +"</td></tr>" \
-                    "<tr><td>Amara ID</td><td>" + amaraID + "</td></tr></table>"
+                #Select only videos from Team Khan-Academy
+                if vid['team'] == "khan-academy":
 
-                #Select only Videos from Team Khan-Academy 
-                if (vid['team'] == "khan-academy"):
-              
-                    ret = ""
                     for lang in vid['languages']:
                         if lang['name'] == "German":
 
-                            #Found a German Language for the selected Video
-                            #Get detailed information on German Subtitle & check if it is completed
-                            
+                            # Found a German language — check completion status
                             subInfoURL = "https://amara.org/api/videos/" + amaraID + "/languages/de"
-                            headers = {'X-api-key': self.amaraAPI} 
-                            subResult = requests.get(subInfoURL,headers=headers)
+                            headers = {'X-api-key': self.amaraAPI}
+                            subResult = requests.get(subInfoURL, headers=headers, timeout=API_TIMEOUT)
                             
                             if subResult.status_code == 403:
                                 self.message = "Please add your Amara API Key, which you can find in your <a target=_new href='https://amara.org/profiles/account'>Amara Account Profile</a>"
@@ -346,39 +429,25 @@ class Subtitles(object):
             self.message = "<b>Unknown Video</b><br/>Youtube Video could not be found on amara.org"
 
     def translateSubtitleAndSubmit(self, enSubtitle, vid, published, subtitle_count):
+        """Check eligibility and signal step 3 (ready to translate via SSE) instead of blocking."""
         amaraID = vid['id']
-        title = vid['title']
-        description = vid['description']
 
-        #check if this is assigned to myself
-        if self.isAssignedToMe(amaraID):
-        
+        print(f"[SUBTITLE] translateSubtitleAndSubmit: force={self.force}, published={published}, subtitle_count={subtitle_count}")
+
+        # Check if this is assigned to myself
+        assigned = self.isAssignedToMe(amaraID)
+        print(f"[SUBTITLE] isAssignedToMe({amaraID}): {assigned}")
+        if assigned:
             if self.force or (not published and subtitle_count == 0):
- 
-                result = self.deeplTranslate(enSubtitle.content)
-
-                if result:
-                    #return jprint(result.json())
-                    deSubtitle = result.json()["translations"][0]["text"]
-
-                    deTitle = self.deeplTranslate(title).json()["translations"][0]["text"]
-                    deDescription = self.deeplTranslate(description).json()["translations"][0]["text"]
-                    deDescription = deDescription.replace("https://www.khanacademy.org", "https://de.khanacademy.org")
-                    deDescription += "\n\nDie deutschen Untertitel für dieses Video wurden vom Team KA Deutsch e.V. erstellt. Wir brauchen deine Unterstützung. https://www.kadeutsch.org"
-                    
-
-                    result = self.addNewSubtitle(amaraID, deSubtitle, deTitle, deDescription)
-                    self.message = "Sucessfully translated. Change to Amara Tab to Review, Edit and Publish"
-                    self.translationStep = 4
-                else:
-                    self.message = "Error in translation" + result.content()
-
-
+                # Signal step 3: page will render immediately, JS auto-starts SSE stream
+                print(f"[SUBTITLE] Ready to translate — deferring to SSE stream (step 3)")
+                self.message = "Translation ready — starting automatically..."
+                self.translationStep = 3
             else:
-                self.message = "<b>There are already versions of this Video, please Review, Edit and Publish</b>" 
+                self.message = "<b>There are already versions of this Video, please Review, Edit and Publish</b>"
                 self.translationStep = 4
         else:
-            self.message = '<b>Please Assign this Video to yourself by clicking on translate link</b><br/>' + str(getAmaraVideoLink(amaraID))  
+            self.message = '<b>Please Assign this Video to yourself by clicking on translate link</b><br/>' + str(getAmaraVideoLink(amaraID))
             self.translationStep = 2
 
 
@@ -389,13 +458,16 @@ def getAmaraUserID():
 
 bp = Blueprint('Subtitles', __name__, url_prefix='/subtitles')
 
-@bp.after_request 
+@bp.after_request
 def after_request(response):
+    """Set security and caching headers on every response."""
+    # TODO: Restrict CORS to your actual frontend origin instead of wildcard
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
-    # Other headers can be added here if needed
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
     return response
 
 @bp.route('/checkSTStep', methods = ['GET', 'POST'])
@@ -425,5 +497,114 @@ def subtitles(YTid=""):
     #Create Blueprint Object
     st = Subtitles(YTid)
     return st.render()
+
+
+@bp.route('/translate-stream')
+def translate_stream():
+    """SSE endpoint that streams translation progress per cue, then uploads to Amara."""
+    amaraAPI = request.args.get('a', '')
+    YTid = request.args.get('YTid', '')
+    force = request.args.get('force', '') == '1'
+
+    if not amaraAPI or not YTid:
+        return jsonify({'error': 'Missing amaraAPI or YTid'}), 400
+
+    def generate():
+        # Create a minimal Subtitles instance outside of request.form context
+        st = Subtitles.__new__(Subtitles)
+        st.YTid = YTid
+        st.amaraAPI = amaraAPI
+        st.amaraID = ''
+        st.force = force
+        st.subtitleInfo = ''
+        st.enSubtitle = ''
+        st.translationStep = 0
+        st.message = ''
+        st.deeplAPI = Configuration.deeplAPI
+
+        yield f"data: {json.dumps({'status': 'init', 'message': 'Resolving video on Amara...'})}\n\n"
+
+        # 1. Resolve YouTube ID to Amara video
+        try:
+            url = "https://amara.org/api/videos/?video_url=https://www.youtube.com/watch?v=" + YTid
+            headers = {'X-api-key': amaraAPI}
+            response = requests.get(url, headers=headers, timeout=API_TIMEOUT).json()
+        except Exception as e:
+            yield f"data: {json.dumps({'error': f'Failed to reach Amara: {str(e)}'})}\n\n"
+            return
+
+        if response["meta"]["total_count"] == 0 or not response.get('objects'):
+            yield f"data: {json.dumps({'error': 'Video not found on Amara'})}\n\n"
+            return
+
+        vid = None
+        for v in response['objects']:
+            if v.get('team') == 'khan-academy':
+                vid = v
+                break
+        if not vid:
+            yield f"data: {json.dumps({'error': 'Khan Academy team video not found'})}\n\n"
+            return
+
+        amaraID = vid['id']
+        st.amaraID = amaraID
+        title = vid['title']
+        description = vid['description']
+
+        yield f"data: {json.dumps({'status': 'init', 'message': f'Found video: {title}'})}\n\n"
+
+        # 2. Check assignment
+        if not st.isAssignedToMe(amaraID):
+            yield f"data: {json.dumps({'error': 'Video is not assigned to you. Please assign it first.'})}\n\n"
+            return
+
+        # 3. Fetch English SRT
+        yield f"data: {json.dumps({'status': 'init', 'message': 'Downloading English subtitles...'})}\n\n"
+        try:
+            ensubURL = f"https://amara.org/api/videos/{amaraID}/languages/en/subtitles/?format=srt"
+            enSubtitle = requests.get(ensubURL, timeout=API_TIMEOUT)
+        except Exception as e:
+            yield f"data: {json.dumps({'error': f'Failed to fetch English SRT: {str(e)}'})}\n\n"
+            return
+
+        if enSubtitle.status_code != 200:
+            yield f"data: {json.dumps({'error': f'English SRT not available (HTTP {enSubtitle.status_code})'})}\n\n"
+            return
+
+        # 4. Stream translation progress
+        yield f"data: {json.dumps({'status': 'translating', 'message': 'Translating subtitles...'})}\n\n"
+        for event in st.translateSRT_streaming(enSubtitle.text):
+            yield event
+
+        if not hasattr(st, '_translated_srt') or not st._translated_srt:
+            # Error was already yielded inside the generator
+            return
+
+        # 5. Translate title & description
+        yield f"data: {json.dumps({'status': 'translating_meta', 'message': 'Translating title & description...'})}\n\n"
+        try:
+            deTitle = st.deeplTranslate(title).json()["translations"][0]["text"]
+            deDescription = st.deeplTranslate(description).json()["translations"][0]["text"]
+            deDescription = deDescription.replace("https://www.khanacademy.org", "https://de.khanacademy.org")
+            deDescription += "\n\nDie deutschen Untertitel für dieses Video wurden vom Team KA Deutsch e.V. erstellt. Wir brauchen deine Unterstützung. https://www.kadeutsch.org"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': f'Failed to translate title/description: {str(e)}'})}\n\n"
+            return
+
+        # 6. Upload to Amara
+        yield f"data: {json.dumps({'status': 'uploading', 'message': 'Uploading to Amara...'})}\n\n"
+        result = st.addNewSubtitle(amaraID, st._translated_srt, deTitle, deDescription)
+
+        if result and result == st._translated_srt:
+            yield f"data: {json.dumps({'status': 'done', 'message': 'Successfully translated and uploaded! Switch to Amara to review.'})}\n\n"
+        elif result == '':
+            yield f"data: {json.dumps({'error': '403 Forbidden — subtitle may be assigned to someone else'})}\n\n"
+        else:
+            yield f"data: {json.dumps({'error': f'Upload failed with status: {result}'})}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream', headers={
+        'Cache-Control': 'no-cache',
+        'X-Accel-Buffering': 'no',
+    })
 
 

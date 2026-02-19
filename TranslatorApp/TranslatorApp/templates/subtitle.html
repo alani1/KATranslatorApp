@@ -53,6 +53,15 @@
     <button type="submit" class="btn btn-primary">Translate</button>
 </form>
 
+<!-- Translation progress bar (hidden until streaming starts) -->
+<div id="progressContainer" style="display:none; margin-top: 20px;">
+    <h4 id="progressStatus">Preparing translation...</h4>
+    <div style="background: #e9ecef; border-radius: 4px; overflow: hidden; height: 24px; width: 100%;">
+        <div id="progressBar" style="background: #0d6efd; height: 100%; width: 0%; transition: width 0.3s ease; text-align: center; color: white; line-height: 24px; font-size: 13px;"></div>
+    </div>
+    <p id="progressDetail" style="margin-top: 6px; color: #666; font-size: 13px;"></p>
+</div>
+
 <script type="text/javascript">
 
     var refreshID;
@@ -114,9 +123,79 @@
         return true;
     }
 
-    // Submit the Form to intiate Deepl Translation
+    // Submit the Form to initiate streaming SSE translation with progress bar
     function submitForm() {
-        document.forms[0].submit();
+        var apiKey = document.getElementById("amaraAPI").value;
+        var ytId = document.getElementById("YTid").value;
+        var forceEl = document.querySelector('input[name="force"]');
+        var force = (forceEl && forceEl.checked) ? '1' : '0';
+
+        if (!apiKey || !ytId) {
+            document.getElementById("msg").innerHTML = "<b>Please enter both Amara API Key and YouTube ID</b>";
+            return;
+        }
+
+        // Show progress bar, hide message
+        document.getElementById("progressContainer").style.display = "block";
+        document.getElementById("progressStatus").innerText = "Connecting...";
+        document.getElementById("progressBar").style.width = "0%";
+        document.getElementById("progressBar").innerText = "";
+        document.getElementById("progressDetail").innerText = "";
+        document.getElementById("msg").innerHTML = "";
+
+        var url = "{{baseURL}}/subtitles/translate-stream?a=" + encodeURIComponent(apiKey) + "&YTid=" + encodeURIComponent(ytId) + "&force=" + force;
+        var source = new EventSource(url);
+
+        source.onmessage = function(event) {
+            var data = JSON.parse(event.data);
+
+            if (data.error) {
+                source.close();
+                document.getElementById("progressStatus").innerText = "Error";
+                document.getElementById("progressBar").style.width = "100%";
+                document.getElementById("progressBar").style.background = "#dc3545";
+                document.getElementById("progressBar").innerText = "Failed";
+                document.getElementById("progressDetail").innerText = data.error;
+                document.getElementById("msg").innerHTML = "<b>" + data.error + "</b>";
+                return;
+            }
+
+            if (data.status === 'init') {
+                document.getElementById("progressStatus").innerText = data.message;
+            } else if (data.status === 'ok' || data.status === 'skip') {
+                var pct = Math.round((data.cue / data.total) * 100);
+                document.getElementById("progressBar").style.width = pct + "%";
+                document.getElementById("progressBar").innerText = pct + "%";
+                document.getElementById("progressStatus").innerText = "Translating cue " + data.cue + " of " + data.total;
+                document.getElementById("progressDetail").innerText = "Cue " + data.cue + "/" + data.total + " " + data.status;
+            } else if (data.status === 'translating') {
+                document.getElementById("progressStatus").innerText = data.message;
+            } else if (data.status === 'translating_meta') {
+                document.getElementById("progressStatus").innerText = data.message || "Translating title & description...";
+            } else if (data.status === 'uploading') {
+                document.getElementById("progressStatus").innerText = data.message;
+                document.getElementById("progressBar").style.width = "100%";
+                document.getElementById("progressBar").innerText = "Uploading...";
+            } else if (data.status === 'done') {
+                source.close();
+                document.getElementById("progressStatus").innerText = "Done!";
+                document.getElementById("progressBar").style.width = "100%";
+                document.getElementById("progressBar").style.background = "#198754";
+                document.getElementById("progressBar").innerText = "Complete";
+                document.getElementById("progressDetail").innerText = "";
+                document.getElementById("msg").innerHTML = "<b>" + data.message + "</b>";
+                // Refresh step indicators
+                setTimeout(checkSteps, 1000);
+            }
+        };
+
+        source.onerror = function() {
+            source.close();
+            document.getElementById("progressStatus").innerText = "Connection lost";
+            document.getElementById("progressBar").style.background = "#dc3545";
+            document.getElementById("progressBar").innerText = "Error";
+            document.getElementById("msg").innerHTML = "<b>Connection to server lost. Check if the server is still running.</b>";
+        };
     }
 
     // TODO in every step also update the Message at top of the page
@@ -169,6 +248,12 @@
 
 
     checkSteps()
+
+    // Auto-start SSE streaming translation when server signals step 3 (ready to translate)
+    if (tStep === 3 && amaraAPI && YTid) {
+        console.log("[SUBTITLE] Step 3 detected on page load — auto-starting SSE translation");
+        submitForm();
+    }
 </script>
 
 
