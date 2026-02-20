@@ -12,6 +12,7 @@ defaultGlossaryName = 'TranslatorApp Glossary'
 
 # ── Amara API ──────────────────────────────────────────────────
 # Get your API key from: https://amara.org/profiles/account
+# amaraADMIN is required for bulk unit translation (assign subtitlers & upload)
 amaraADMIN = 'your-amara-admin-api-key'                  # Amara Admin API key
 amaraAPI = 'your-amara-user-api-key'                      # Amara regular user API key
 

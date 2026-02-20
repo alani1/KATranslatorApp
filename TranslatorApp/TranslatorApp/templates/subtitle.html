@@ -42,7 +42,7 @@
 <hr />
 <form action="{{ url_for('Subtitles.subtitles') }}" method="post">
     <div class="form-group">
-        <label for="amaraAPI">Amara-Key</label> &nbsp;<input id="amaraAPI" name="amaraAPI" type=text value="{{ amaraAPI }}" onchange="checkSteps();">
+        <label for="amaraAPI">Amara-Key</label> &nbsp;<input id="amaraAPI" name="amaraAPI" type="password" value="{{ amaraAPI }}" onchange="saveAmaraKey(); checkSteps();" autocomplete="off">
     </div>
     <div class="form-group">
         <label for="YTid">Youtube-ID</label> &nbsp;<input id="YTid" name="YTid" type=text value="{{ YTid }}" onchange="checkSteps();">
@@ -71,6 +71,30 @@
     amaraAPI = "{{ amaraAPI }}";
     YTid = "{{ YTid }}";
     tStep = {{ translationStep }};
+
+    // Restore Amara key from localStorage if the server didn't provide one
+    (function restoreAmaraKey() {
+        var input = document.getElementById("amaraAPI");
+        if (!input.value) {
+            var saved = localStorage.getItem("amaraAPIKey");
+            if (saved) {
+                input.value = saved;
+                amaraAPI = saved;
+            }
+        } else {
+            // Server provided a key — keep localStorage in sync
+            localStorage.setItem("amaraAPIKey", input.value);
+        }
+    })();
+
+    function saveAmaraKey() {
+        var val = document.getElementById("amaraAPI").value;
+        if (val) {
+            localStorage.setItem("amaraAPIKey", val);
+        } else {
+            localStorage.removeItem("amaraAPIKey");
+        }
+    }
 
     // Check if Video is Step
     function checkSteps() {
@@ -106,7 +130,7 @@
             })
             .then(data => {
                 if (typeof data.result !== 'undefined') {
-                    updateStepUI(data.result);
+                    updateStepUI(data.result, data.assignee || '');
                 }
             })
             .catch(error => {
@@ -199,8 +223,9 @@
     }
 
     // TODO in every step also update the Message at top of the page
-    function updateStepUI(step) {
+    function updateStepUI(step, assignee) {
         console.log("CheckSteps: " + step);
+        var assignedLabel = assignee ? "Assigned to " + assignee : "Assigned";
 
         if (step == 1) {
             document.getElementById("step1-ico").className = "fa-solid fa-circle-check";
@@ -209,14 +234,14 @@
             document.getElementById("step1-ico").className = "fa-solid fa-circle-check";
             document.getElementById("step2-ico").className = "fa-solid fa-circle-check";
             document.getElementById("InstructionStep1").innerHTML = "Done";
-            document.getElementById("InstructionStep2").innerHTML = "Assigned";
+            document.getElementById("InstructionStep2").innerHTML = assignedLabel;
             document.getElementById("InstructionStep3").innerHTML = '<button onClick="submitForm();" type="button" class="btn btn-primary">Translate</button>';
         } else if (step == 3) {
             document.getElementById("step1-ico").className = "fa-solid fa-circle-check";
             document.getElementById("step2-ico").className = "fa-solid fa-circle-check";
             document.getElementById("step3-ico").className = "fa-solid fa-circle-check";
             document.getElementById("InstructionStep1").innerHTML = "Done";
-            document.getElementById("InstructionStep2").innerHTML = "Assigned";
+            document.getElementById("InstructionStep2").innerHTML = assignedLabel;
             document.getElementById("InstructionStep3").innerHTML = "Pre-Translated";
         } else if (step == 4) {
             document.getElementById("step1-ico").className = "fa-solid fa-circle-check";
@@ -224,7 +249,7 @@
             document.getElementById("step3-ico").className = "fa-solid fa-circle-check";
             document.getElementById("step4-ico").className = "fa-solid fa-circle-check";
             document.getElementById("InstructionStep1").innerHTML = "Done";
-            document.getElementById("InstructionStep2").innerHTML = "Assigned";
+            document.getElementById("InstructionStep2").innerHTML = assignedLabel;
             document.getElementById("InstructionStep3").innerHTML = "Pre-Translated";
 
             // TODO: Issue amara returns 302, need to show an error message explaining that the user is not allowed to review
@@ -238,7 +263,7 @@
             document.getElementById("step3-ico").className = "fa-solid fa-circle-check";
             document.getElementById("step4-ico").className = "fa-solid fa-circle-check";
             document.getElementById("InstructionStep1").innerHTML = "Done";
-            document.getElementById("InstructionStep2").innerHTML = "Assigned";
+            document.getElementById("InstructionStep2").innerHTML = assignedLabel;
             document.getElementById("InstructionStep3").innerHTML = "Pre-Translated";
             document.getElementById("InstructionStep4").innerHTML = "Reviewed";
             document.getElementById("msg").innerHTML = "The Subtitle Translation & Review are complete";

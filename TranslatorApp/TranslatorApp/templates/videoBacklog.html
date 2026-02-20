@@ -174,6 +174,72 @@
 </div>
 {% endif %}
 
+<!-- Bulk Translate Unit Modal (admin only) -->
+{% if user.isAdmin() %}
+<div class="modal fade" id="bulkTranslateModal" tabindex="-1" aria-labelledby="bulkTranslateLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bulkTranslateLabel">Bulk Translate Unit</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close" onclick="cancelBulkTranslation()">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="bulkSetup">
+                    <p><strong>Course:</strong> <span id="bulkCourse"></span></p>
+                    <p><strong>Unit:</strong> <span id="bulkUnit"></span></p>
+                    <p id="bulkVideoCount" style="color: #666;"><em>Loading video count...</em></p>
+
+                    <div id="bulkPreviewTable" style="max-height: 200px; overflow-y: auto; margin-bottom: 15px; display:none;">
+                        <table class="table table-sm table-bordered" id="bulkVideoList">
+                            <thead><tr><th>Title</th><th>Duration</th><th>Status</th><th>Eligible</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bulkAmaraUser"><strong>Translator (optional, for DB record):</strong></label>
+                        <input type="text" class="form-control" id="bulkAmaraUser" list="translatorList" placeholder="Username to record as translator">
+                        <small class="form-text text-muted">Assignment links will be shown after each video is translated.</small>
+                    </div>
+                    <br/>
+                    <button type="button" class="btn btn-primary" id="btnStartBulk" onclick="startBulkTranslation()">
+                        <i class="fa-solid fa-language"></i> Start Bulk Translation
+                    </button>
+                </div>
+
+                <!-- Progress Section -->
+                <div id="bulkProgress" style="display: none;">
+                    <h6>Overall Progress</h6>
+                    <div style="background: #e9ecef; border-radius: 4px; height: 28px; margin-bottom: 8px;">
+                        <div id="bulkOverallBar" style="background: #0d6efd; height: 100%; width: 0%; transition: width 0.3s ease; text-align: center; color: white; line-height: 28px; font-size: 13px; border-radius: 4px;"></div>
+                    </div>
+                    <p id="bulkOverallStatus" style="font-size: 13px; color: #666;"></p>
+
+                    <h6>Current Video</h6>
+                    <div style="background: #e9ecef; border-radius: 4px; height: 24px; margin-bottom: 8px;">
+                        <div id="bulkCueBar" style="background: #17a2b8; height: 100%; width: 0%; transition: width 0.3s ease; text-align: center; color: white; line-height: 24px; font-size: 12px; border-radius: 4px;"></div>
+                    </div>
+                    <p id="bulkCueStatus" style="font-size: 13px; color: #666;"></p>
+
+                    <h6>Log</h6>
+                    <div id="bulkLog" style="max-height: 250px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px;"></div>
+                </div>
+
+                <!-- Summary Section -->
+                <div id="bulkSummary" style="display: none; margin-top: 15px;">
+                    <div class="alert" id="bulkSummaryAlert"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" onclick="cancelBulkTranslation()">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <script type="text/javascript">
     var ytDescription = [];
     myGrid=new gridjs.Grid({
@@ -323,6 +389,11 @@
                             $('#editModal').modal('show');"><i class="fa-solid fa-pen-to-square"></i></button>&nbsp`;
                         {% endif %}
 
+                    // Bulk translate unit button (admin only)
+                    {% if user.isAdmin() %}
+                    buttons += `<button type="button" class="btn btn-sm btn-outline-primary" data-toggle="tooltip" data-placement="top" title="Translate entire unit" onclick="openBulkTranslate('${row.cells[4].data}', '${row.cells[5].data}')"><i class="fa-solid fa-language"></i></button>&nbsp`;
+                    {% endif %}
+
                     // Only show the button if there is a local video
 
                     if (row.cells[17].data != null) {
@@ -394,6 +465,205 @@
             }
         });
 
+    }
+
+    // ── Bulk Translate Unit ──────────────────────────────────────────
+    var bulkEventSource = null;
+
+    function openBulkTranslate(course, unit) {
+        // Reset UI
+        document.getElementById('bulkCourse').textContent = course;
+        document.getElementById('bulkUnit').textContent = unit;
+        document.getElementById('bulkVideoCount').innerHTML = '<em>Loading video count...</em>';
+        document.getElementById('bulkPreviewTable').style.display = 'none';
+        document.getElementById('bulkVideoList').querySelector('tbody').innerHTML = '';
+        document.getElementById('bulkAmaraUser').value = '';
+        document.getElementById('bulkSetup').style.display = '';
+        document.getElementById('bulkProgress').style.display = 'none';
+        document.getElementById('bulkSummary').style.display = 'none';
+        document.getElementById('bulkLog').innerHTML = '';
+        document.getElementById('bulkOverallBar').style.width = '0%';
+        document.getElementById('bulkOverallBar').textContent = '';
+        document.getElementById('bulkCueBar').style.width = '0%';
+        document.getElementById('bulkCueBar').textContent = '';
+        document.getElementById('bulkOverallStatus').textContent = '';
+        document.getElementById('bulkCueStatus').textContent = '';
+        document.getElementById('btnStartBulk').disabled = false;
+
+        // Fetch eligible videos preview
+        fetch('{{ baseURL }}/subtitles/unit-videos?course=' + encodeURIComponent(course) + '&unit=' + encodeURIComponent(unit))
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    document.getElementById('bulkVideoCount').innerHTML = '<span style="color:red;">Error: ' + data.error + '</span>';
+                    return;
+                }
+                var eligible = data.videos.filter(v => v.eligible);
+                var info = '<strong>' + eligible.length + '</strong> eligible of <strong>' + data.videos.length + '</strong> total videos in this unit';
+
+                // Estimated words & characters
+                if (data.estimated_words > 0) {
+                    info += '<br/>Estimated: ~<strong>' + data.estimated_words.toLocaleString() + '</strong> words (~' + data.estimated_chars.toLocaleString() + ' characters)';
+                }
+
+                // DeepL quota
+                if (data.deepl_quota) {
+                    var q = data.deepl_quota;
+                    var usedPct = Math.round((q.character_count / q.character_limit) * 100);
+                    var remaining = q.characters_remaining.toLocaleString();
+                    var quotaColor = q.characters_remaining < data.estimated_chars ? '#dc3545' : '#28a745';
+                    info += '<br/>DeepL quota: <strong style="color:' + quotaColor + '">' + remaining + '</strong> characters remaining (' + usedPct + '% used)';
+                    if (q.characters_remaining < data.estimated_chars) {
+                        info += '<br/><span style="color:#dc3545;">⚠ Estimated usage exceeds remaining quota!</span>';
+                    }
+                }
+
+                document.getElementById('bulkVideoCount').innerHTML = info;
+
+                // Populate preview table
+                var tbody = document.getElementById('bulkVideoList').querySelector('tbody');
+                data.videos.forEach(v => {
+                    var tr = document.createElement('tr');
+                    var mins = Math.floor(v.duration / 60);
+                    var secs = v.duration % 60;
+                    tr.innerHTML =
+                        '<td>' + v.original_title + '</td>' +
+                        '<td>' + mins + ':' + (secs < 10 ? '0' : '') + secs + '</td>' +
+                        '<td>' + (v.subbed === 'True' ? '<span style="color:green;">Subbed</span>' : v.dubbed === 'True' ? '<span style="color:green;">Dubbed</span>' : '<span style="color:orange;">Pending</span>') + '</td>' +
+                        '<td>' + (v.eligible ? '✅' : '❌') + '</td>';
+                    tbody.appendChild(tr);
+                });
+                document.getElementById('bulkPreviewTable').style.display = '';
+            })
+            .catch(err => {
+                document.getElementById('bulkVideoCount').innerHTML = '<span style="color:red;">Failed to load: ' + err + '</span>';
+            });
+
+        $('#bulkTranslateModal').modal('show');
+    }
+
+    function startBulkTranslation() {
+        var course = document.getElementById('bulkCourse').textContent;
+        var unit = document.getElementById('bulkUnit').textContent;
+        var amaraUser = document.getElementById('bulkAmaraUser').value.trim();
+
+        // Switch to progress view
+        document.getElementById('bulkSetup').style.display = 'none';
+        document.getElementById('bulkProgress').style.display = '';
+        document.getElementById('btnStartBulk').disabled = true;
+
+        var logDiv = document.getElementById('bulkLog');
+        var videoIdx = 0;
+        var totalVideos = 0;
+
+        var url = '{{ baseURL }}/subtitles/bulk-translate-stream?course=' + encodeURIComponent(course) +
+            '&unit=' + encodeURIComponent(unit) + '&amaraUser=' + encodeURIComponent(amaraUser);
+
+        bulkEventSource = new EventSource(url);
+
+        bulkEventSource.onmessage = function (event) {
+            var d = JSON.parse(event.data);
+            var status = d.status;
+
+            if (status === 'video_start') {
+                videoIdx = d.video;
+                totalVideos = d.totalVideos;
+                var pct = Math.round((videoIdx / totalVideos) * 100);
+                document.getElementById('bulkOverallBar').style.width = pct + '%';
+                document.getElementById('bulkOverallBar').textContent = videoIdx + ' / ' + totalVideos;
+                document.getElementById('bulkOverallStatus').textContent = 'Processing: ' + d.title;
+                document.getElementById('bulkCueBar').style.width = '0%';
+                document.getElementById('bulkCueBar').textContent = '';
+                document.getElementById('bulkCueStatus').textContent = '';
+                appendLog(logDiv, '🎬 [' + videoIdx + '/' + totalVideos + '] ' + d.title, '#333');
+
+            } else if (status === 'skip') {
+                appendLog(logDiv, '  ⏭ Skipped: ' + d.reason, '#888');
+
+            } else if (status === 'translating') {
+                appendLog(logDiv, '  🔤 ' + d.message, '#17a2b8');
+
+            } else if (status === 'cue_progress') {
+                var cuePct = Math.round((d.cue / d.totalCues) * 100);
+                document.getElementById('bulkCueBar').style.width = cuePct + '%';
+                document.getElementById('bulkCueBar').textContent = d.cue + ' / ' + d.totalCues;
+                document.getElementById('bulkCueStatus').textContent = 'Cue ' + d.cue + ' of ' + d.totalCues;
+
+            } else if (status === 'translating_meta') {
+                appendLog(logDiv, '  📝 Translating title & description...', '#17a2b8');
+
+            } else if (status === 'uploading') {
+                document.getElementById('bulkCueBar').style.width = '100%';
+                document.getElementById('bulkCueBar').textContent = 'Uploading...';
+                appendLog(logDiv, '  📤 Uploading to Amara...', '#6f42c1');
+
+            } else if (status === 'video_done') {
+                appendLog(logDiv, '  ✅ Done!', '#28a745');
+                if (d.amara_id) {
+                    appendLogHtml(logDiv,
+                        '  📋 <a href="https://amara.org/subtitles/editor/' + d.amara_id + '/de?team=khan-academy" target="_blank">Review in Editor</a>' +
+                        ' &nbsp;|&nbsp; <a href="https://amara.org/teams/khan-academy/videos/' + d.amara_id + '/collaborations/" target="_blank">Assign User</a>',
+                        '#0d6efd');
+                }
+
+            } else if (status === 'error') {
+                appendLog(logDiv, '  ❌ Error: ' + d.error, '#dc3545');
+
+            } else if (status === 'done') {
+                bulkEventSource.close();
+                bulkEventSource = null;
+                document.getElementById('bulkOverallBar').style.width = '100%';
+                document.getElementById('bulkOverallBar').textContent = 'Complete';
+                document.getElementById('bulkCueBar').style.width = '100%';
+                document.getElementById('bulkCueStatus').textContent = '';
+
+                var s = d.summary;
+                appendLog(logDiv, '── Complete: ' + s.translated + ' translated, ' + s.skipped + ' skipped, ' + s.failed + ' errors ──', '#333');
+
+                // Show summary alert
+                var alertDiv = document.getElementById('bulkSummaryAlert');
+                var cls = s.failed > 0 ? 'alert-warning' : 'alert-success';
+                alertDiv.className = 'alert ' + cls;
+                alertDiv.innerHTML = '<strong>Bulk Translation Complete</strong><br>' +
+                    'Total: ' + (s.translated + s.skipped + s.failed) + ' &nbsp;|&nbsp; Translated: ' + s.translated +
+                    ' &nbsp;|&nbsp; Skipped: ' + s.skipped + ' &nbsp;|&nbsp; Errors: ' + s.failed;
+                document.getElementById('bulkSummary').style.display = '';
+
+                // Refresh the grid to show updated statuses
+                myGrid.forceRender();
+            }
+        };
+
+        bulkEventSource.onerror = function () {
+            if (bulkEventSource) {
+                bulkEventSource.close();
+                bulkEventSource = null;
+                appendLog(logDiv, '❌ Connection lost.', '#dc3545');
+            }
+        };
+    }
+
+    function cancelBulkTranslation() {
+        if (bulkEventSource) {
+            bulkEventSource.close();
+            bulkEventSource = null;
+        }
+    }
+
+    function appendLog(logDiv, text, color) {
+        var line = document.createElement('div');
+        line.style.color = color || '#333';
+        line.textContent = text;
+        logDiv.appendChild(line);
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function appendLogHtml(logDiv, html, color) {
+        var line = document.createElement('div');
+        line.style.color = color || '#333';
+        line.innerHTML = html;
+        logDiv.appendChild(line);
+        logDiv.scrollTop = logDiv.scrollHeight;
     }
 
 </script>

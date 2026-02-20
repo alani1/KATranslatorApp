@@ -1,5 +1,6 @@
 ﻿import json
 import re
+import time
 from datetime import datetime
 from flask import (
     Blueprint, flash, g, redirect, render_template, make_response, request, jsonify, Response
@@ -11,6 +12,9 @@ import pymysql
 
 # Timeout (seconds) for all outbound HTTP requests to Amara and DeepL APIs
 API_TIMEOUT = 30
+
+# Delay between videos in bulk operations (seconds) to respect Amara rate limits
+BULK_VIDEO_DELAY = 1.5
 
 
 def jprint(obj):
@@ -148,6 +152,9 @@ class Subtitles(object):
         if( response.get('objects') != None and len(response['objects']) > 0):
             status = response['objects'][0]['work_status']
 
+            # Extract the assigned subtitler username (if any)
+            subtitler_obj = response['objects'][0].get('subtitler')
+            assignee = subtitler_obj.get('username', '') if subtitler_obj else ''
 
             #TODO improve: check if subtitle request is assigned to me (AMARA UserID), MetaDataField: googleplus
             if (status == "being-subtitled"):
@@ -159,19 +166,19 @@ class Subtitles(object):
                 if ( self.hasGermanSubtitles()):
 
                     #TODO: check if Step 4 is finished e.g. has the subtitle been marked as complete in our DataBase or on Amara --> udpateDB ???
-                    result = { 'result': 3 }
+                    result = { 'result': 3, 'assignee': assignee }
                 else:
-                    result = { 'result': 2 }
+                    result = { 'result': 2, 'assignee': assignee }
             elif (status == "needs-reviewer" or status == 'beeing-reviewed'):
                 #Subtitle is in progress on Amara, update the status in DB
                 self.updateVideoStatus(response['objects'][0])
 
-                result = { 'result': 4 }
+                result = { 'result': 4, 'assignee': assignee }
             elif (status == "complete"):
                 #Subtitle is in progress on Amara, update the status in DB
                 self.updateVideoStatus(response['objects'][0])
 
-                result = { 'result': 5 }
+                result = { 'result': 5, 'assignee': assignee }
             else:
                 result = { 'result': 1 }
         else:
@@ -609,3 +616,448 @@ def translate_stream():
     })
 
 
+# ---------------------------------------------------------------------------
+# Bulk Unit Translation — Endpoints
+# ---------------------------------------------------------------------------
+
+@bp.route('/unit-videos')
+def unit_videos():
+    """Return eligible (untranslated, English-source) videos for a given course + unit.
+
+    Query params:
+        course: course slug (e.g. 'cc-seventh-grade-math')
+        unit:   unit slug   (e.g. 'cc-7th-ratio-proportion')
+
+    Returns JSON list of {id, youtube_id, original_title, duration, subbed, dubbed, translation_status, translator}.
+    Admin-only.
+    """
+    course = request.args.get('course', '')
+    unit = request.args.get('unit', '')
+    if not course or not unit:
+        return jsonify({'error': 'Missing course or unit parameter'}), 400
+
+    try:
+        conn = pymysql.connect(
+            host=Configuration.dbHost, user=Configuration.dbUser,
+            password=Configuration.dbPassword, db=Configuration.dbDatabase,
+            charset='utf8mb4', cursorclass=pymysql.cursors.DictCursor
+        )
+        with conn.cursor() as cursor:
+            sql = (
+                "SELECT id, youtube_id, original_title, duration, subbed, dubbed, "
+                "translation_status, translator "
+                "FROM `ka-content` "
+                "WHERE course = %s AND unit = %s "
+                "AND (kind = 'Video' OR kind = 'Talkthrough') "
+                "AND source_lang = 'en' "
+                "ORDER BY original_title"
+            )
+            cursor.execute(sql, (course, unit))
+            videos = cursor.fetchall()
+        conn.close()
+    except Exception as e:
+        return jsonify({'error': f'Database error: {type(e).__name__}'}), 500
+
+    # Annotate eligibility: already subbed/dubbed → not eligible
+    total_duration = 0
+    for v in videos:
+        # Ensure duration is a plain int (MySQL may return None or other types)
+        v['duration'] = int(v['duration']) if v.get('duration') else 0
+        v['eligible'] = (v.get('subbed') != 'True' and v.get('dubbed') != 'True')
+        if v['eligible']:
+            total_duration += v['duration']
+        # Ensure all values are JSON-serializable (no datetime objects, etc.)
+        for key in v:
+            if v[key] is None:
+                v[key] = None
+            elif not isinstance(v[key], (str, int, float, bool)):
+                v[key] = str(v[key])
+
+    # Estimate word count: ~150 words/min for educational content, ~5 chars/word
+    est_words = int(total_duration / 60 * 150)
+    est_chars = est_words * 5
+
+    # Fetch DeepL quota
+    deepl_quota = None
+    try:
+        durl = "https://api-free.deepl.com/v2/usage"
+        dheaders = {'Authorization': 'DeepL-Auth-Key ' + Configuration.deeplAPI}
+        usage = requests.get(durl, headers=dheaders, timeout=API_TIMEOUT).json()
+        deepl_quota = {
+            'character_count': usage.get('character_count', 0),
+            'character_limit': usage.get('character_limit', 0),
+            'characters_remaining': usage.get('character_limit', 0) - usage.get('character_count', 0)
+        }
+    except Exception as e:
+        print(f"[BULK] DeepL quota check failed: {e}")
+
+    try:
+        return jsonify({
+            'videos': videos,
+            'estimated_words': est_words,
+            'estimated_chars': est_chars,
+            'deepl_quota': deepl_quota
+        })
+    except Exception as e:
+        print(f"[BULK] jsonify error: {e}")
+        return jsonify({'error': f'Serialization error: {type(e).__name__}: {e}'}), 500
+
+
+@bp.route('/bulk-translate-stream')
+def bulk_translate_stream():
+    """SSE endpoint: translate + upload German subtitles for all videos in a unit.
+
+    Query params:
+        course:    course slug
+        unit:      unit slug
+        amaraUser: (optional) username to record as translator in the DB
+    """
+    course = request.args.get('course', '')
+    unit = request.args.get('unit', '')
+    amara_user = request.args.get('amaraUser', '')
+
+    if not course or not unit:
+        return jsonify({'error': 'Missing course or unit parameter'}), 400
+
+    def generate():
+        admin_key = Configuration.amaraADMIN
+        deepl_key = Configuration.deeplAPI
+        summary = {'translated': 0, 'skipped': 0, 'failed': 0, 'errors': []}
+
+        yield _sse({'status': 'init', 'message': f'Loading videos for {course} / {unit}...'})
+
+        # 1. Load eligible videos from DB
+        try:
+            conn = pymysql.connect(
+                host=Configuration.dbHost, user=Configuration.dbUser,
+                password=Configuration.dbPassword, db=Configuration.dbDatabase,
+                charset='utf8mb4', cursorclass=pymysql.cursors.DictCursor
+            )
+            with conn.cursor() as cursor:
+                sql = (
+                    "SELECT id, youtube_id, original_title, duration "
+                    "FROM `ka-content` "
+                    "WHERE course = %s AND unit = %s "
+                    "AND (kind = 'Video' OR kind = 'Talkthrough') "
+                    "AND source_lang = 'en' "
+                    "AND subbed != 'True' AND dubbed != 'True' "
+                    "ORDER BY original_title"
+                )
+                cursor.execute(sql, (course, unit))
+                videos = cursor.fetchall()
+        except Exception as e:
+            yield _sse({'error': f'Database error: {type(e).__name__}: {e}'})
+            return
+
+        total_videos = len(videos)
+        if total_videos == 0:
+            yield _sse({'status': 'done', 'message': 'No eligible videos found in this unit.', 'summary': summary})
+            return
+
+        yield _sse({'status': 'init', 'message': f'Found {total_videos} eligible videos. Starting bulk translation...'})
+
+        # 2. Process each video
+        for idx, video in enumerate(videos):
+            v_num = idx + 1
+            yt_id = video.get('youtube_id') or ''
+            title = video.get('original_title', 'Unknown')
+            db_id = video.get('id')
+
+            yield _sse({'status': 'video_start', 'video': v_num, 'totalVideos': total_videos, 'title': title})
+
+            if not yt_id:
+                yield _sse({'status': 'skip', 'video': v_num, 'totalVideos': total_videos, 'title': title, 'reason': 'No YouTube ID'})
+                summary['skipped'] += 1
+                continue
+
+            try:
+                # --- Step A: Resolve Amara ID ---
+                amara_vid = _resolve_amara_video(yt_id, admin_key)
+                if not amara_vid:
+                    yield _sse({'status': 'skip', 'video': v_num, 'totalVideos': total_videos, 'title': title, 'reason': 'Not found on Amara'})
+                    summary['skipped'] += 1
+                    continue
+
+                amara_id = amara_vid['id']
+                vid_title = amara_vid.get('title', title)
+                vid_description = amara_vid.get('description', '')
+
+                # --- Step B: Check if already has German subtitles ---
+                if _has_german_subtitles(amara_id, admin_key):
+                    yield _sse({'status': 'skip', 'video': v_num, 'totalVideos': total_videos, 'title': vid_title, 'reason': 'Already has German subtitles'})
+                    summary['skipped'] += 1
+                    # Update DB to reflect it's subbed
+                    _update_db_status(conn, db_id, subbed='True')
+                    continue
+
+                # --- Step C: Fetch English SRT ---
+                en_srt = _fetch_english_srt(amara_id, admin_key)
+                if not en_srt:
+                    yield _sse({'status': 'skip', 'video': v_num, 'totalVideos': total_videos, 'title': vid_title, 'reason': 'No English subtitles available'})
+                    summary['skipped'] += 1
+                    continue
+
+                # --- Step D: Translate cue-by-cue ---
+                yield _sse({'status': 'translating', 'video': v_num, 'totalVideos': total_videos, 'title': vid_title, 'message': 'Translating subtitles...'})
+
+                srt_text = en_srt.replace('\r\n', '\n').replace('\r', '\n')
+                blocks = re.split(r'\n\n+', srt_text.strip())
+                total_cues = len(blocks)
+                translated_blocks = []
+                cue_error = False
+
+                for ci, block in enumerate(blocks):
+                    lines = block.split('\n')
+                    if len(lines) < 3:
+                        translated_blocks.append(block)
+                        continue
+
+                    cue_index = lines[0]
+                    timecode = lines[1]
+                    cue_text = '\n'.join(lines[2:])
+
+                    try:
+                        result = _deepl_translate(cue_text, deepl_key)
+                        translated_text = result.json()["translations"][0]["text"]
+                        translated_blocks.append(f"{cue_index}\n{timecode}\n{translated_text}")
+                    except Exception as e:
+                        # Retry once
+                        try:
+                            time.sleep(1)
+                            result = _deepl_translate(cue_text, deepl_key)
+                            translated_text = result.json()["translations"][0]["text"]
+                            translated_blocks.append(f"{cue_index}\n{timecode}\n{translated_text}")
+                        except Exception as e2:
+                            yield _sse({'status': 'error', 'video': v_num, 'totalVideos': total_videos, 'title': vid_title, 'error': f'DeepL error on cue {ci+1}: {e2}'})
+                            cue_error = True
+                            break
+
+                    # Send cue progress every 5 cues to reduce SSE traffic
+                    if (ci + 1) % 5 == 0 or ci + 1 == total_cues:
+                        yield _sse({'status': 'cue_progress', 'video': v_num, 'totalVideos': total_videos, 'cue': ci + 1, 'totalCues': total_cues})
+
+                if cue_error:
+                    summary['failed'] += 1
+                    continue
+
+                translated_srt = '\n\n'.join(translated_blocks)
+
+                # --- Step E: Translate title & description ---
+                yield _sse({'status': 'translating_meta', 'video': v_num, 'totalVideos': total_videos, 'title': vid_title, 'message': 'Translating title & description...'})
+                try:
+                    de_title = _deepl_translate(vid_title, deepl_key).json()["translations"][0]["text"]
+                    de_description = _deepl_translate(vid_description, deepl_key).json()["translations"][0]["text"] if vid_description else ''
+                    de_description = de_description.replace("https://www.khanacademy.org", "https://de.khanacademy.org")
+                    de_description += "\n\nDie deutschen Untertitel für dieses Video wurden vom Team KA Deutsch e.V. erstellt. Wir brauchen deine Unterstützung. https://www.kadeutsch.org"
+                except Exception as e:
+                    yield _sse({'status': 'error', 'video': v_num, 'totalVideos': total_videos, 'title': vid_title, 'error': f'Failed to translate title/description: {e}'})
+                    summary['failed'] += 1
+                    continue
+
+                # --- Step F: Upload to Amara ---
+                yield _sse({'status': 'uploading', 'video': v_num, 'totalVideos': total_videos, 'title': vid_title, 'message': 'Uploading to Amara...'})
+                upload_ok = _upload_to_amara(amara_id, translated_srt, de_title, de_description, amara_user, admin_key)
+                if not upload_ok:
+                    yield _sse({'status': 'error', 'video': v_num, 'totalVideos': total_videos, 'title': vid_title, 'error': 'Amara upload failed'})
+                    summary['failed'] += 1
+                    continue
+
+                # --- Step G: Update DB ---
+                _update_db_status(conn, db_id, subbed='True', translator=amara_user,
+                                  translation_status='Translated',
+                                  translation_date=datetime.today().strftime("%Y-%m-%d"))
+
+                yield _sse({'status': 'video_done', 'video': v_num, 'totalVideos': total_videos, 'title': vid_title, 'amara_id': amara_id})
+                summary['translated'] += 1
+
+                # Rate-limit delay between videos
+                if v_num < total_videos:
+                    time.sleep(BULK_VIDEO_DELAY)
+
+            except Exception as e:
+                yield _sse({'status': 'error', 'video': v_num, 'totalVideos': total_videos, 'title': title, 'error': str(e)})
+                summary['failed'] += 1
+                summary['errors'].append(f'{title}: {e}')
+                continue
+
+        # 3. Close DB and send summary
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+        yield _sse({'status': 'done', 'message': f'Bulk translation complete. {summary["translated"]} translated, {summary["skipped"]} skipped, {summary["failed"]} failed.', 'summary': summary})
+
+    return Response(generate(), mimetype='text/event-stream', headers={
+        'Cache-Control': 'no-cache',
+        'X-Accel-Buffering': 'no',
+    })
+
+
+# ---------------------------------------------------------------------------
+# Bulk Translation — Helper Functions
+# ---------------------------------------------------------------------------
+
+def _sse(data):
+    """Format a dict as an SSE data line."""
+    return f"data: {json.dumps(data)}\n\n"
+
+
+def _resolve_amara_video(yt_id, api_key):
+    """Resolve a YouTube ID to an Amara khan-academy team video dict, or None."""
+    url = f"https://amara.org/api/videos/?video_url=https://www.youtube.com/watch?v={yt_id}"
+    headers = {'X-api-key': api_key}
+    try:
+        resp = requests.get(url, headers=headers, timeout=API_TIMEOUT).json()
+        if resp.get('meta', {}).get('total_count', 0) > 0 and resp.get('objects'):
+            for v in resp['objects']:
+                if v.get('team') == 'khan-academy':
+                    return v
+    except Exception as e:
+        print(f"[BULK] Amara resolve error for {yt_id}: {e}")
+    return None
+
+
+def _has_german_subtitles(amara_id, api_key):
+    """Check if German subtitles already exist and are complete on Amara."""
+    url = f"https://amara.org/api/videos/{amara_id}/languages/de"
+    headers = {'X-api-key': api_key}
+    try:
+        resp = requests.get(url, headers=headers, timeout=API_TIMEOUT)
+        if resp.status_code == 404:
+            return False  # No German language track at all
+        data = resp.json()
+        return data.get('subtitles_complete', False) or len(data.get('versions', [])) > 0
+    except Exception:
+        return False
+
+
+def _assign_on_amara(amara_id, amara_user, admin_key):
+    """Assign a subtitler to a video on Amara using the admin API key.
+
+    Steps:
+      1. Check existing subtitle request for this video + de language
+      2. Create one if it doesn't exist
+      3. PUT to assign the subtitler
+
+    Returns {'ok': True} on success, or {'error': 'reason'} on failure.
+    """
+    headers = {'X-api-key': admin_key, 'Content-Type': 'application/json'}
+
+    # Step 1: Find existing subtitle request
+    url = f"https://amara.org/api/teams/khan-academy/subtitle-requests/?language=de&video={amara_id}"
+    try:
+        resp = requests.get(url, headers=headers, timeout=API_TIMEOUT)
+        data = resp.json()
+    except Exception as e:
+        return {'error': f'Failed to check subtitle request: {e}'}
+
+    job_id = None
+    if data.get('objects') and len(data['objects']) > 0:
+        sr = data['objects'][0]
+        job_id = sr.get('pk') or sr.get('id')
+        # Check if already assigned to someone else
+        current_subtitler = sr.get('subtitler')
+        if current_subtitler:
+            current_username = current_subtitler.get('username', '') if isinstance(current_subtitler, dict) else str(current_subtitler)
+            if current_username == amara_user:
+                return {'ok': True}  # Already assigned to target user
+            elif current_username:
+                return {'error': f'Already assigned to {current_username}'}
+
+    # Step 2: Create subtitle request if none exists
+    if not job_id:
+        try:
+            create_url = "https://amara.org/api/teams/khan-academy/subtitle-requests/"
+            create_data = json.dumps({"video": amara_id, "language": "de"})
+            resp = requests.post(create_url, headers=headers, data=create_data, timeout=API_TIMEOUT)
+            if resp.status_code in (200, 201):
+                sr = resp.json()
+                job_id = sr.get('pk') or sr.get('id')
+            elif resp.status_code == 409:
+                # Conflict — request already exists, re-fetch
+                resp2 = requests.get(url, headers=headers, timeout=API_TIMEOUT)
+                data2 = resp2.json()
+                if data2.get('objects') and len(data2['objects']) > 0:
+                    job_id = data2['objects'][0].get('pk') or data2['objects'][0].get('id')
+            else:
+                return {'error': f'Failed to create subtitle request (HTTP {resp.status_code}): {resp.text[:200]}'}
+        except Exception as e:
+            return {'error': f'Failed to create subtitle request: {e}'}
+
+    if not job_id:
+        return {'error': 'Could not obtain subtitle request job ID'}
+
+    # Step 3: Assign the subtitler
+    try:
+        assign_url = f"https://amara.org/api/teams/khan-academy/subtitle-requests/{job_id}/"
+        assign_data = json.dumps({"subtitler": amara_user})
+        resp = requests.put(assign_url, headers=headers, data=assign_data, timeout=API_TIMEOUT)
+        if resp.status_code == 200:
+            return {'ok': True}
+        else:
+            return {'error': f'Assignment failed (HTTP {resp.status_code}): {resp.text[:200]}'}
+    except Exception as e:
+        return {'error': f'Assignment failed: {e}'}
+
+
+def _fetch_english_srt(amara_id, api_key):
+    """Fetch the English SRT text from Amara. Returns the SRT string or None."""
+    url = f"https://amara.org/api/videos/{amara_id}/languages/en/subtitles/?format=srt"
+    try:
+        resp = requests.get(url, headers={'X-api-key': api_key}, timeout=API_TIMEOUT)
+        if resp.status_code == 200 and len(resp.text.strip()) > 0:
+            return resp.text
+    except Exception as e:
+        print(f"[BULK] Failed to fetch English SRT for {amara_id}: {e}")
+    return None
+
+
+def _deepl_translate(text, api_key):
+    """Translate text EN→DE via DeepL. Returns the raw Response."""
+    url = "https://api-free.deepl.com/v2/translate"
+    headers = {'Authorization': f'DeepL-Auth-Key {api_key}'}
+    data = {'target_lang': 'DE', 'formality': 'less', 'text': text}
+    return requests.post(url, headers=headers, data=data, timeout=API_TIMEOUT)
+
+
+def _upload_to_amara(amara_id, srt, title, description, amara_user, admin_key):
+    """Upload German SRT to Amara as save-draft using the assigned user's implicit permission via admin key.
+
+    The upload uses the admin key since the admin assigned the task.
+    Returns True on success, False on failure.
+    """
+    url = f"https://amara.org/api/videos/{amara_id}/languages/de/subtitles/"
+    headers = {'X-api-key': admin_key}
+    data = {
+        'sub_format': 'srt',
+        'title': title,
+        'description': description,
+        'subtitles': srt,
+        'action': 'save-draft',
+        'team': 'khan-academy'
+    }
+    try:
+        resp = requests.post(url, headers=headers, data=data, timeout=API_TIMEOUT)
+        print(f"[BULK] Upload to Amara for {amara_id}: HTTP {resp.status_code}")
+        return resp.status_code in (200, 201)
+    except Exception as e:
+        print(f"[BULK] Upload failed for {amara_id}: {e}")
+        return False
+
+
+def _update_db_status(conn, content_id, **fields):
+    """Update ka-content fields for a given content ID. Silently ignores errors."""
+    allowed = {'subbed', 'dubbed', 'translator', 'translation_status', 'translation_date'}
+    updates = {k: v for k, v in fields.items() if k in allowed}
+    if not updates:
+        return
+    try:
+        with conn.cursor() as cursor:
+            set_clause = ', '.join([f"`{k}` = %s" for k in updates])
+            values = list(updates.values()) + [content_id]
+            sql = f"UPDATE `ka-content` SET {set_clause} WHERE id = %s"
+            cursor.execute(sql, tuple(values))
+            conn.commit()
+    except Exception as e:
+        print(f"[BULK] DB update failed for {content_id}: {e}")
