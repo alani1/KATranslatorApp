@@ -720,8 +720,13 @@ def bulk_translate_stream():
         return jsonify({'error': 'Missing course or unit parameter'}), 400
 
     def generate():
-        admin_key = Configuration.amaraADMIN
+        admin_key = getattr(Configuration, 'amaraADMIN', '') or getattr(Configuration, 'amaraAPI', '')
         deepl_key = Configuration.deeplAPI
+
+        if not admin_key:
+            yield _sse({'error': 'Missing amaraADMIN/amaraAPI in Configuration.py'})
+            return
+
         summary = {'translated': 0, 'skipped': 0, 'failed': 0, 'errors': []}
 
         yield _sse({'status': 'init', 'message': f'Loading videos for {course} / {unit}...'})
